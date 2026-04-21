@@ -1,0 +1,42 @@
+{
+  "python": {
+    "latency_ns": 447898.198,
+    "latency_median_ns": 404150.0,
+    "latency_p95_ns": 758300,
+    "latency_p99_ns": 1108800,
+    "latency_min_ns": 299200,
+    "latency_max_ns": 1447600,
+    "latency_std_ns": 148220.9445346787,
+    "throughput": "2.2K/s",
+    "accuracy": 0.99,
+    "per_class_accuracy": {
+      "class_4": 0.9818181818181818,
+      "class_1": 1.0,
+      "class_2": 0.9891304347826086,
+      "class_6": 0.95,
+      "class_7": 1.0,
+      "class_0": 0.96,
+      "class_5": 1.0,
+      "class_3": 1.0
+    },
+    "samples_tested": 500,
+    "peak_ram_mb": 0.25,
+    "avg_ram_mb": 0.23863636363637397,
+    "avg_cpu_pct": 63.654545454545456
+  },
+  "c_engine": {
+    "latency_ns": 191800.5,
+    "latency_median_ns": 191800.5,
+    "latency_p95_ns": 244241.52,
+    "latency_p99_ns": 244352.2,
+    "latency_min_ns": 169113.4,
+    "latency_max_ns": 244352.2,
+    "latency_std_ns": 26220.51,
+    "throughput": "5.2K/s",
+    "throughput_sps": 5214,
+    "runs": 5000,
+    "peak_ram_mb": 4.875,
+    "avg_ram_mb": 4.8052631578947365,
+    "avg_cpu_pct": 96.44
+  }
+}
