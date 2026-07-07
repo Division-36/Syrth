@@ -1703,7 +1703,10 @@ def _infer_cwe_from_text(text: str) -> str | None:
 
 
 def _tokenise_description(description: str, cwe_id: str) -> list[str]:
-    tokens: list[str] = [f"cwe:{cwe_id}"]
+    # NOTE: deliberately does NOT emit a "cwe:<id>" token. Including the
+    # ground-truth CWE as a feature would leak the label and let the model
+    # "cheat". The class is the prediction target, never an input.
+    tokens: list[str] = []
     for frag in re.findall(r"`([^`]{1,80})`", description)[:10]:
         tokens.append(f"code:{normalise_token(frag)}")
     for sink in SINK_REGISTRY:
@@ -1716,7 +1719,49 @@ def _tokenise_description(description: str, cwe_id: str) -> list[str]:
     for fw in ("django", "fastapi", "flask", "starlette", "drf"):
         if fw in description.lower():
             tokens.append(f"framework:{fw}")
-    return tokens or [f"cwe:{cwe_id}", "no_code_context"]
+    return tokens or ["no_code_context"]
+
+
+def _tokens_from_advisory_code(description: str) -> list[str]:
+    """Extract inference-aligned tokens from python fenced code in an advisory.
+
+    The code is run through collect.py's AST extractor so training tokens use
+    exactly the same vocabulary/format as syrth_scan.py produces at inference
+    time (def:/arg:/sink:/call:/ret:/@decorator/meta:no_auth). Returns [] when
+    no parseable python code is present.
+    """
+    try:
+        from collect import extract_traces_from_source
+    except Exception:
+        return []
+    out: list[str] = []
+    for block in re.findall(r"```(?:python|py)?\s*(.*?)```", description, re.DOTALL):
+        try:
+            ft = extract_traces_from_source(block, label="<advisory>")
+        except Exception:
+            continue
+        for func in ft.functions:
+            seq = func.to_token_sequence()
+            if seq:
+                out.extend(seq)
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for t in out:
+        if t not in seen:
+            seen.add(t)
+            deduped.append(t)
+    return deduped
+
+
+def _build_advisory_tokens(description: str, severity: str, cwe_id: str) -> list[str]:
+    """Prefer code-derived (inference-aligned) tokens; fall back to text tokens."""
+    code_tokens = _tokens_from_advisory_code(description)
+    if code_tokens:
+        sev = (severity or "").lower()
+        if sev in ("critical", "high", "moderate", "low"):
+            code_tokens = code_tokens + [f"severity:{sev}"]
+        return code_tokens
+    return _tokenise_description(description, cwe_id)
 
 
 def fetch_osv_records(max_entries: int = 10000) -> list[dict[str, Any]]:
@@ -2124,7 +2169,7 @@ def _gh_node_to_record(node: dict[str, Any]) -> dict[str, Any] | None:
         "updated_at": advisory.get("updatedAt", ""),
         "vulnerable_versions": vuln_range,
         "first_patched_version": first_patched,
-        "tokens": _tokenise_description(full_description, cwe_id),
+        "tokens": _build_advisory_tokens(full_description, advisory.get("severity", ""), cwe_id),
         "summary": advisory.get("summary", ""),
         "description": advisory.get("description", ""),
         "references": [r.get("url", "") for r in refs if r.get("url")],
