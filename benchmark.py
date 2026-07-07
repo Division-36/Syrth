@@ -24,6 +24,7 @@ import sys
 import os
 import time
 import subprocess
+import ctypes
 import statistics
 import json
 import threading

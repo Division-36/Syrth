@@ -373,20 +373,19 @@ def export_c_header(
     C header file for zero-dependency production inference.
 
     Strategy (keeping C tractable):
-        1. Freeze the Transformer encoder weights and pre-compute the
-           mean-pooled embedding for each token in the vocabulary — this
-           flattens the Transformer into a lookup + average operation,
-           which is expressible in pure C without matrix ops.
-        2. Export the MLP head weights (2 linear layers) as C float arrays.
-        3. Generate a C inference function `syrth_predict()` that:
-           a. Maps token strings → vocab IDs (via a sorted string table)
-           b. Averages the pre-computed embeddings for the input tokens
-           c. Runs the 2-layer MLP on the pooled vector
-           d. Returns the argmax class index and confidence score.
+         1. Freeze the embedding weights and average-pool the token
+            embeddings — expressible in pure C as a lookup + average.
+         2. Export the MLP head weights (3 linear layers, ReLU) as C
+            float arrays, matching the PyTorch `SyrthEncoder` exactly.
+         3. Generate a C inference function `syrth_predict()` that:
+            a. Maps token strings → vocab IDs (via a sorted string table)
+            b. Averages the embeddings for the input tokens
+            c. Runs the 3-layer ReLU MLP on the pooled vector
+            d. Returns the argmax class index and confidence score.
 
-    This approach sacrifices transformer-level attention at inference
-    in exchange for a ~50KB standalone header with zero dependencies.
-    """
+     This mirrors the Python model exactly (Bag-of-Words embedding +
+     mean pooling + 3-layer ReLU MLP) so dev and fast modes agree.
+     """
     model.eval()
     state = {k: v.cpu().numpy() for k, v in model.state_dict().items()}
     vocab = tokenizer.vocab  # token → int_id
@@ -394,17 +393,21 @@ def export_c_header(
     # Pre-compute token embeddings (vocab_size × embed_dim)
     embed_weight = state["embedding.weight"]  # (vocab_size, embed_dim)
 
-    # MLP head weights
+    # MLP head weights — three linear layers (ReLU activations)
     # head.0 = Linear(embed_dim, ffn_dim)
-    # head.3 = Linear(ffn_dim, num_classes)
+    # head.3 = Linear(ffn_dim, ffn_dim // 2)
+    # head.6 = Linear(ffn_dim // 2, num_classes)
     mlp_w0 = state["head.0.weight"]   # (ffn_dim, embed_dim)
     mlp_b0 = state["head.0.bias"]     # (ffn_dim,)
-    mlp_w1 = state["head.3.weight"]   # (num_classes, ffn_dim)
-    mlp_b1 = state["head.3.bias"]     # (num_classes,)
+    mlp_w1 = state["head.3.weight"]   # (ffn_dim // 2, ffn_dim)
+    mlp_b1 = state["head.3.bias"]     # (ffn_dim // 2,)
+    mlp_w2 = state["head.6.weight"]   # (num_classes, ffn_dim // 2)
+    mlp_b2 = state["head.6.bias"]     # (num_classes,)
+    ffn2_dim = int(mlp_w1.shape[0])   # hidden size of layer 1
 
     vocab_size, embed_dim = embed_weight.shape
     ffn_dim_actual = mlp_w0.shape[0]
-    num_classes_actual = mlp_w1.shape[0]
+    num_classes_actual = mlp_w2.shape[0]
 
     # Build sorted vocab array for binary search in C
     sorted_vocab = sorted(vocab.items(), key=lambda kv: kv[0])
@@ -438,6 +441,7 @@ def export_c_header(
         f"#define SYRTH_VOCAB_SIZE   {vocab_size}",
         f"#define SYRTH_EMBED_DIM    {embed_dim}",
         f"#define SYRTH_FFN_DIM      {ffn_dim_actual}",
+        f"#define SYRTH_FFN2_DIM     {ffn2_dim}",
         f"#define SYRTH_NUM_CLASSES  {num_classes_actual}",
         f"#define SYRTH_MAX_TOKENS   {MAX_SEQ_LEN}",
         "",
@@ -461,12 +465,15 @@ def export_c_header(
     lines += [
         "/* ── Embedding weight matrix ──────────────────────────────────── */",
         _array_to_c("SYRTH_EMBED", embed_weight),
-        "/* ── MLP layer 0 weights + biases ─────────────────────────────── */",
+        "/* ── MLP layer 0 (embed -> ffn) weights + biases ──────────────── */",
         _array_to_c("SYRTH_W0", mlp_w0),
         _array_to_c("SYRTH_B0", mlp_b0),
-        "/* ── MLP layer 1 weights + biases ─────────────────────────────── */",
+        "/* ── MLP layer 1 (ffn -> ffn/2) weights + biases ──────────────── */",
         _array_to_c("SYRTH_W1", mlp_w1),
         _array_to_c("SYRTH_B1", mlp_b1),
+        "/* ── MLP layer 2 (ffn/2 -> num_classes) weights + biases ──────── */",
+        _array_to_c("SYRTH_W2", mlp_w2),
+        _array_to_c("SYRTH_B2", mlp_b2),
     ]
 
     # Inline C functions
@@ -487,9 +494,9 @@ def export_c_header(
         "    return 1; /* UNK */",
         "}",
         "",
-        "/* GELU activation (approximate) */",
-        "static float syrth_gelu(float x) {",
-        "    return 0.5f * x * (1.0f + tanhf(0.7978845608f * (x + 0.044715f * x * x * x)));",
+        "/* ReLU activation (matches PyTorch training) */",
+        "static float syrth_relu(float x) {",
+        "    return x > 0.0f ? x : 0.0f;",
         "}",
         "",
         "/* Softmax in-place */",
@@ -528,21 +535,30 @@ def export_c_header(
         "    if (count > 0)",
         "        for (int d = 0; d < SYRTH_EMBED_DIM; d++) pooled[d] /= (float)count;",
         "",
-        "    /* 2. MLP layer 0: W0 @ pooled + B0 → GELU */",
-        "    float hidden[SYRTH_FFN_DIM];",
+        "    /* 2. MLP layer 0: W0 @ pooled + B0 → ReLU → hidden1 */",
+        "    float hidden1[SYRTH_FFN_DIM];",
         "    for (int i = 0; i < SYRTH_FFN_DIM; i++) {",
         "        float acc = SYRTH_B0[i];",
         "        for (int j = 0; j < SYRTH_EMBED_DIM; j++)",
         "            acc += SYRTH_W0[i * SYRTH_EMBED_DIM + j] * pooled[j];",
-        "        hidden[i] = syrth_gelu(acc);",
+        "        hidden1[i] = syrth_relu(acc);",
         "    }",
         "",
-        "    /* 3. MLP layer 1: W1 @ hidden + B1 → logits */",
-        "    float logits[SYRTH_NUM_CLASSES];",
-        "    for (int i = 0; i < SYRTH_NUM_CLASSES; i++) {",
+        "    /* 3. MLP layer 1: W1 @ hidden1 + B1 → ReLU → hidden2 */",
+        "    float hidden2[SYRTH_FFN2_DIM];",
+        "    for (int i = 0; i < SYRTH_FFN2_DIM; i++) {",
         "        float acc = SYRTH_B1[i];",
         "        for (int j = 0; j < SYRTH_FFN_DIM; j++)",
-        "            acc += SYRTH_W1[i * SYRTH_FFN_DIM + j] * hidden[j];",
+        "            acc += SYRTH_W1[i * SYRTH_FFN_DIM + j] * hidden1[j];",
+        "        hidden2[i] = syrth_relu(acc);",
+        "    }",
+        "",
+        "    /* 4. MLP layer 2: W2 @ hidden2 + B2 → logits */",
+        "    float logits[SYRTH_NUM_CLASSES];",
+        "    for (int i = 0; i < SYRTH_NUM_CLASSES; i++) {",
+        "        float acc = SYRTH_B2[i];",
+        "        for (int j = 0; j < SYRTH_FFN2_DIM; j++)",
+        "            acc += SYRTH_W2[i * SYRTH_FFN2_DIM + j] * hidden2[j];",
         "        logits[i] = acc;",
         "    }",
         "",

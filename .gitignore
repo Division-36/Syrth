@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# SYRTH artifacts (generated, not source)
+syrth_model.joblib
+syrth_engine.so
+syrth_engine.h
+
+# OS / editor
+.DS_Store
+*.swp
+*~
+
+# Local temp / verification scratch
+__verify.txt

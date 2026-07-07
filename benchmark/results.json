@@ -1,0 +1,48 @@
+{
+  "python": {
+    "latency_ns": 2639642.136929461,
+    "latency_median_ns": 1437818.0,
+    "latency_p95_ns": 10059212,
+    "latency_p99_ns": 19130102,
+    "latency_min_ns": 321768,
+    "latency_max_ns": 23509997,
+    "latency_std_ns": 3399154.591289955,
+    "throughput": "379/s",
+    "accuracy": 0.3091286307053942,
+    "per_class_accuracy": {
+      "class_2": 0.0,
+      "class_5": 0.8076923076923077,
+      "class_1": 0.17197452229299362,
+      "class_6": 0.08,
+      "class_7": 0.8095238095238095,
+      "class_4": 0.09803921568627451,
+      "class_3": 0.01694915254237288,
+      "class_0": 0.18181818181818182
+    },
+    "samples_tested": 482,
+    "peak_ram_mb": 0.27734375,
+    "avg_ram_mb": 0.25743558114032794,
+    "avg_cpu_pct": 49.29210526315789
+  },
+  "c_engine": {
+    "latency_ns": 297968.43,
+    "latency_median_ns": 297968.43,
+    "latency_p95_ns": 369900.31,
+    "latency_p99_ns": 357690.65,
+    "latency_min_ns": 252096.17,
+    "latency_max_ns": 357690.65,
+    "latency_std_ns": 35965.94,
+    "throughput": "3.4K/s",
+    "throughput_sps": 3356,
+    "runs": 5000,
+    "peak_ram_mb": 5.05859375,
+    "avg_ram_mb": 4.9665100524475525,
+    "avg_cpu_pct": 95.62937062937063
+  },
+  "agreement": {
+    "samples": 482,
+    "dev_accuracy": 0.3091286307053942,
+    "fast_accuracy": 0.3091286307053942,
+    "agreement": 1.0
+  }
+}

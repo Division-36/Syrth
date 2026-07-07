@@ -51,12 +51,26 @@ def _record_hash(r: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+# Only keep tokens that carry security semantics and match the vocabulary
+# syrth_scan.py emits at inference time. Drop free-text `code:` fragments
+# (normalised advisory snippets) — they are high-cardinality noise that does
+# not appear in real code and hurts generalisation.
+_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "severity", "framework"}
+
+
+def _keep_token(t: str) -> bool:
+    if t.startswith("@"):  # security decorators (@login_required, ...)
+        return True
+    return t.split(":", 1)[0] in _ALLOWED_PREFIX
+
+
 def re_tokenize(records: list[dict]) -> list[dict]:
     out: list[dict] = []
     skipped = 0
     for r in records:
         desc = r.get("description") or r.get("summary") or ""
         toks = H._build_advisory_tokens(desc, r.get("severity", ""), r.get("cwe_id", ""))
+        toks = [t for t in toks if _keep_token(t)]
         if not toks:
             skipped += 1
             continue
