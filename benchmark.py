@@ -618,6 +618,83 @@ def benchmark_c_engine() -> Dict:
 # CHARTS & VISUALIZATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════
+# DEV vs FAST AGREEMENT (proof the C engine is faithful)
+# ═════════════════════════════════════════════════════════════
+
+def benchmark_agreement(samples: List, max_samples: int = BENCHMARK_RUNS) -> Dict:
+    """Verify the compiled C engine (fast mode) agrees with the joblib model
+    (dev mode) on the held-out test set.
+
+    This is the proof that syrth_engine.h (exported by train_model.py) is a
+    faithful, numerically-equivalent implementation of the PyTorch model. If
+    dev and fast disagree, the production C engine would misclassify.
+    """
+    if not MODEL_PATH.exists():
+        return {"error": f"Model not found: {MODEL_PATH}"}
+    if not C_HEADER_PATH.exists():
+        return {"error": f"C header not found: {C_HEADER_PATH}"}
+    try:
+        import joblib
+        import torch
+        from train_model import SyrthTokenizer, SyrthEncoder
+        import syrth_scan
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+
+    sys.path.insert(0, str(ROOT))
+    try:
+        bundle = joblib.load(MODEL_PATH)
+        tokenizer = SyrthTokenizer()
+        tokenizer.vocab = bundle["tokenizer_vocab"]
+        cfg = bundle["model_config"]
+        model = SyrthEncoder(
+            vocab_size=cfg["vocab_size"],
+            embed_dim=cfg.get("embed_dim", 64),
+            ffn_dim=cfg.get("ffn_dim", 128),
+            num_classes=cfg.get("num_classes", 8),
+        )
+        model.load_state_dict(
+            {k: torch.tensor(v) for k, v in bundle["model_state_dict"].items()}
+        )
+        model.eval()
+        lib = syrth_scan._build_fast_engine(str(C_HEADER_PATH))
+    except Exception as e:  # noqa: BLE001
+        return {"error": str(e)}
+
+    dev_preds: List[int] = []
+    fast_preds: List[int] = []
+    true_labels: List[int] = []
+    for tokens, label, _ in samples[:max_samples]:
+        ids = tokenizer.encode(tokens)
+        with torch.no_grad():
+            x = torch.tensor([ids], dtype=torch.long)
+            dev_pred = model(x).argmax(dim=-1).item()
+
+        c_tokens = (ctypes.c_char_p * len(tokens))(
+            *[t.encode("utf-8") for t in tokens]
+        )
+        out_class = ctypes.c_int(0)
+        out_conf = ctypes.c_float(0.0)
+        lib.syrth_run(c_tokens, len(tokens), ctypes.byref(out_class), ctypes.byref(out_conf))
+        fast_pred = out_class.value
+
+        dev_preds.append(dev_pred)
+        fast_preds.append(fast_pred)
+        true_labels.append(label)
+
+    n = max(1, len(true_labels))
+    dev_acc = sum(1 for p, t in zip(dev_preds, true_labels) if p == t) / n
+    fast_acc = sum(1 for p, t in zip(fast_preds, true_labels) if p == t) / n
+    agree = sum(1 for a, b in zip(dev_preds, fast_preds) if a == b) / n
+    return {
+        "samples": n,
+        "dev_accuracy": dev_acc,
+        "fast_accuracy": fast_acc,
+        "agreement": agree,
+    }
+
+
 def create_latency_chart(python_results: Dict, c_results: Dict, output_path: Path):
     """Create latency comparison chart."""
     if not HAS_MPL:
@@ -975,8 +1052,11 @@ def main():
 
     # Load test samples with STRICT train/test split
     print("[1/5] Loading test samples with STRICT train/test split...")
+    # When a dedicated test dataset is supplied, use ALL of it as the test set
+    # (it is already a held-out split produced by repair_dataset.py).
+    _test_ratio = 1.0 if args.testing_dataset else TEST_SPLIT_RATIO
     test_samples, train_info, dataset_stats = load_dataset_strict_split(
-        TEST_SPLIT_RATIO, RANDOM_SEED
+        _test_ratio, RANDOM_SEED
     )
     
     if len(test_samples) < 10:
@@ -1020,6 +1100,17 @@ def main():
         print(f"  ✓ Peak RAM: {c_results.get('peak_ram_mb', 0):.1f} MB")
         print(f"  ✓ Throughput: {c_results.get('throughput_sps', 0)/1000:.1f}K sps")
 
+    # Verify the compiled C engine matches the PyTorch model
+    print("\n[3b/5] Verifying C engine (fast) vs Python model (dev) agreement...")
+    agreement = benchmark_agreement(test_samples)
+    results["agreement"] = agreement
+    if "error" in agreement:
+        print(f"  ✗ Agreement check skipped: {agreement['error']}")
+    else:
+        print(f"  ✓ dev  accuracy: {agreement['dev_accuracy'] * 100:.1f}%")
+        print(f"  ✓ fast accuracy: {agreement['fast_accuracy'] * 100:.1f}%")
+        print(f"  ✓ dev/fast agreement: {agreement['agreement'] * 100:.1f}%")
+
     # Save results
     print("\n[4/5] Saving results...")
 
@@ -1041,6 +1132,7 @@ def main():
         "dataset_stats": dataset_stats,
         "python": python_results if "error" not in results.get("python", {}) else None,
         "c_engine": c_results if "error" not in results.get("c_engine", {}) else None,
+        "agreement": agreement if "error" not in results.get("agreement", {}) else None,
     }
 
     metrics_path = BENCH_DIR / "metrics.json"
@@ -1074,7 +1166,11 @@ def main():
         print(f"RESULT: C Engine is {speedup:.1f}x faster than Python")
         print(f"   Python: {fmt_time(python_results['latency_ns'])} per inference")
         print(f"   C:      {fmt_time(c_results['latency_ns'])} per inference")
-        print(f"   Model Accuracy: {python_results['accuracy'] * 100:.1f}%")
+        print(f"   Model Accuracy (dev):  {python_results['accuracy'] * 100:.1f}%")
+        if "error" not in results.get("agreement", {}):
+            ag = results["agreement"]
+            print(f"   Model Accuracy (fast): {ag['fast_accuracy'] * 100:.1f}%")
+            print(f"   Dev/Fast agreement:    {ag['agreement'] * 100:.1f}%")
         print(f"   NO DATA LEAKAGE: Test set strictly held out from training")
     print(f"\n All results saved to: {BENCH_DIR}")
     print("=" * 80)
