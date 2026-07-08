@@ -1,7 +1,7 @@
 """
 SYRTH: Scan Your Risk Trace History
 ====================================
-syrth_scan.py — Production inference script.
+syrth_scan.py — Production inference script with explainability.
 
 Modes:
     --mode dev    Loads the .joblib bundle (PyTorch inference).
@@ -11,6 +11,7 @@ Usage:
     python syrth_scan.py --file views.py --mode dev
     python collect.py --single-file views.py | python syrth_scan.py --mode dev
     python syrth_scan.py --file views.py --mode dev --threshold 0.70
+    python syrth_scan.py --file views.py --mode dev --json  # includes explainability
 """
 
 from __future__ import annotations
@@ -231,6 +232,270 @@ def _extract_from_file(source_path: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Explainability
+# ---------------------------------------------------------------------------
+
+# Token prefixes that indicate specific vulnerability patterns
+_SINK_PREFIXES = {"sink:", "call:"}
+_SOURCE_PREFIXES = {"arg:", "meta:"}
+_AUTH_TOKENS = {"@login_required", "@csrf_exempt", "meta:has_auth", "meta:no_auth"}
+
+
+def _compute_token_importance(
+    tokens: list[str],
+    bundle: dict[str, Any],
+    predicted_class: str,
+    top_k: int = 10,
+) -> list[dict[str, Any]]:
+    """
+    Compute per-token importance for the predicted class.
+
+    Uses embedding dot product with the final classification layer weights.
+    Tokens whose embeddings align most with the class weights are most important.
+    """
+    try:
+        import torch
+        import numpy as np
+    except ImportError:
+        return []
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from train_model import SyrthEncoder, SyrthTokenizer
+
+    cfg   = bundle["model_config"]
+    vocab = bundle["tokenizer_vocab"]
+
+    tok = SyrthTokenizer()
+    tok.vocab    = vocab
+    tok._next_id = max(vocab.values()) + 1
+
+    model = SyrthEncoder(
+        vocab_size=cfg["vocab_size"],
+        embed_dim=cfg["embed_dim"],
+        ffn_dim=cfg.get("ffn_dim", 128),
+        num_classes=cfg["num_classes"],
+        dropout=0.0,
+    )
+    state_dict = {
+        k: torch.from_numpy(v.astype(np.float32))
+        for k, v in bundle["model_state_dict"].items()
+    }
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    # Get the class index
+    class_idx = CLASS_NAMES.index(predicted_class) if predicted_class in CLASS_NAMES else 0
+
+    # Get the final classification layer weights for the predicted class
+    # head is Sequential: Linear(256,1024) -> ReLU -> Dropout -> Linear(1024,512) -> ReLU -> Dropout -> Linear(512,5)
+    # head[-1] = Linear(512, 5), weight shape = (5, 512)
+    final_weight = model.head[-1].weight[class_idx]  # (512,)
+
+    # Get embedding weights
+    emb_weights = model.embedding.weight.data  # (vocab_size, embed_dim)
+
+    # Project embedding weights through the MLP layers
+    # Layer 0: Linear(256, 1024)
+    w0 = model.head[0].weight.data  # (1024, 256)
+    projected = torch.matmul(emb_weights, w0.T)  # (vocab_size, 1024)
+    projected = torch.relu(projected)
+
+    # Layer 3: Linear(1024, 512)
+    w3 = model.head[3].weight.data  # (512, 1024)
+    projected = torch.matmul(projected, w3.T)  # (vocab_size, 512)
+    projected = torch.relu(projected)
+
+    # Compute alignment with the final class weights
+    importance_scores = torch.matmul(projected, final_weight)  # (vocab_size,)
+
+    # Get unique tokens and their counts
+    token_counts = {}
+    for t in tokens:
+        token_counts[t] = token_counts.get(t, 0) + 1
+
+    # Score each unique token
+    token_scores = []
+    for token in set(tokens):
+        if token in tok.vocab:
+            idx = tok.vocab[token]
+            score = importance_scores[idx].item()
+            token_scores.append({
+                "token": token,
+                "importance": round(score, 4),
+                "count": token_counts[token],
+                "type": _classify_token(token),
+            })
+
+    # Sort by importance (absolute value) and return top_k
+    token_scores.sort(key=lambda x: abs(x["importance"]), reverse=True)
+    return token_scores[:top_k]
+
+
+def _classify_token(token: str) -> str:
+    """Classify a token into a category for display."""
+    if token.startswith("sink:"):
+        return "sink"
+    elif token.startswith("call:"):
+        return "call"
+    elif token.startswith("arg:"):
+        return "source"
+    elif token.startswith("@"):
+        return "decorator"
+    elif token.startswith("def:"):
+        return "function"
+    elif token.startswith("meta:"):
+        return "metadata"
+    elif token.startswith("ret:"):
+        return "return"
+    else:
+        return "other"
+
+
+def _extract_per_function_patterns(trace: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Extract per-function vulnerability patterns from the trace.
+
+    Returns a list of function-level findings with:
+    - name: function name
+    - lineno: line number
+    - sinks: list of dangerous sinks found
+    - has_auth: whether auth decorator is present
+    - tokens: function's token sequence
+    - risk_factors: list of risk indicators
+    """
+    functions = trace.get("functions", [])
+    if not functions:
+        return []
+
+    patterns = []
+    for func in functions:
+        name = func.get("name", "<unknown>")
+        lineno = func.get("lineno", 0)
+        tokens = func.get("tokens", [])
+        has_auth = func.get("has_auth_decorator", False)
+        has_csrf_exempt = func.get("has_csrf_exempt", False)
+        sinks = func.get("sinks", [])
+        has_sql_string = func.get("has_sql_string", False)
+        sink_count = func.get("sink_count", 0)
+
+        # Identify risk factors
+        risk_factors = []
+
+        # Check for dangerous sinks
+        sink_tokens = [t for t in tokens if t.startswith("sink:")]
+        if sink_tokens:
+            sink_names = [t.split(":", 1)[1] for t in sink_tokens]
+            risk_factors.append(f"Dangerous sinks: {', '.join(sink_names)}")
+
+        # Check for user input sources
+        source_tokens = [t for t in tokens if t.startswith("arg:")]
+        if source_tokens:
+            source_names = [t.split(":", 1)[1] for t in source_tokens]
+            risk_factors.append(f"User input sources: {', '.join(source_names)}")
+
+        # Check auth status
+        if has_auth:
+            risk_factors.append("Has authentication decorator")
+        else:
+            risk_factors.append("No authentication decorator")
+
+        if has_csrf_exempt:
+            risk_factors.append("CSRF protection disabled")
+
+        if has_sql_string:
+            risk_factors.append("Contains SQL string literal")
+
+        # Determine risk level
+        risk_level = "low"
+        if sink_count > 0 and not has_auth:
+            risk_level = "high"
+        elif sink_count > 0 or has_csrf_exempt:
+            risk_level = "medium"
+
+        if tokens:  # Only include functions with tokens
+            patterns.append({
+                "name": name,
+                "lineno": lineno,
+                "sinks": sinks,
+                "sink_count": sink_count,
+                "has_auth": has_auth,
+                "has_csrf_exempt": has_csrf_exempt,
+                "has_sql_string": has_sql_string,
+                "risk_level": risk_level,
+                "risk_factors": risk_factors,
+                "token_count": len(tokens),
+            })
+
+    return patterns
+
+
+def _generate_pattern_summary(
+    predicted_class: str,
+    confidence: float,
+    per_function_patterns: list[dict[str, Any]],
+    token_importance: list[dict[str, Any]],
+) -> str:
+    """
+    Generate a human-readable summary of the vulnerability pattern.
+
+    Describes WHAT was found, WHERE, and WHY it's risky.
+    """
+    if not per_function_patterns:
+        return "No function-level patterns available."
+
+    # Find high-risk functions
+    high_risk = [p for p in per_function_patterns if p["risk_level"] == "high"]
+    medium_risk = [p for p in per_function_patterns if p["risk_level"] == "medium"]
+
+    lines = []
+
+    # Overall assessment
+    if confidence >= 0.8:
+        assessment = "High confidence"
+    elif confidence >= 0.6:
+        assessment = "Moderate confidence"
+    else:
+        assessment = "Low confidence"
+
+    lines.append(f"{assessment} classification as {predicted_class}")
+
+    # Vulnerability chain description
+    if high_risk:
+        func = high_risk[0]
+        sinks = func.get("sinks", [])
+        if sinks:
+            sink_str = ", ".join(sinks[:3])
+            lines.append(
+                f"Function '{func['name']}' (line {func['lineno']}) "
+                f"contains dangerous sink(s): {sink_str}"
+            )
+            if not func["has_auth"]:
+                lines.append("  -> No authentication guard present")
+            if func["has_csrf_exempt"]:
+                lines.append("  -> CSRF protection explicitly disabled")
+        else:
+            lines.append(
+                f"Function '{func['name']}' (line {func['lineno']}) "
+                f"has risk indicators but no explicit sinks"
+            )
+    elif medium_risk:
+        func = medium_risk[0]
+        lines.append(
+            f"Function '{func['name']}' (line {func['lineno']}) "
+            f"has potential risk factors"
+        )
+
+    # Top contributing tokens
+    if token_importance:
+        top_tokens = [t for t in token_importance[:5] if t["type"] in ("sink", "call", "source")]
+        if top_tokens:
+            token_strs = [f"{t['token']} ({t['type']})" for t in top_tokens]
+            lines.append(f"Key tokens: {', '.join(token_strs)}")
+
+    return "\n    ".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Output formatting
 # ---------------------------------------------------------------------------
 
@@ -265,14 +530,15 @@ def _print_results(
     source_label: str,
     mode: str,
     threshold: float,
+    explainability: dict[str, Any] | None = None,
 ) -> None:
     top_class, top_conf = results[0]
 
-    print(f"\n{'━' * 56}")
+    print(f"\n{'━' * 64}")
     print(f"  SYRTH: Scan Your Risk Trace History")
     print(f"  Source : {source_label}")
     print(f"  Mode   : {mode.upper()}")
-    print(f"{'━' * 56}")
+    print(f"{'━' * 64}")
 
     if top_conf < threshold:
         print(
@@ -288,6 +554,40 @@ def _print_results(
         if top_conf < CONFIDENCE_DISCLAIMER:
             print(f"\n  ⚠  Low confidence ({top_conf:.0%}). Manual review recommended.")
 
+    # ── Explainability section ────────────────────────────────────────────
+    if explainability and top_conf >= threshold:
+        # Pattern summary
+        pattern_summary = explainability.get("pattern_summary", "")
+        if pattern_summary:
+            print(f"\n  Pattern Analysis:")
+            print(f"    {pattern_summary}")
+
+        # Per-function breakdown
+        per_function = explainability.get("per_function", [])
+        if per_function:
+            print(f"\n  Function Breakdown:")
+            for func in per_function:
+                risk_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(
+                    func["risk_level"], "⚪"
+                )
+                sinks_str = ", ".join(func["sinks"][:3]) if func["sinks"] else "none"
+                auth_str = "✓ auth" if func["has_auth"] else "✗ no auth"
+                print(
+                    f"    {risk_icon} {func['name']} (line {func['lineno']}): "
+                    f"sinks=[{sinks_str}] {auth_str}"
+                )
+                for factor in func.get("risk_factors", []):
+                    print(f"       → {factor}")
+
+        # Token importance
+        token_imp = explainability.get("token_importance", [])
+        if token_imp:
+            print(f"\n  Key Tokens:")
+            for t in token_imp[:7]:
+                bar_len = min(int(abs(t["importance"]) * 20), 20)
+                bar = "█" * bar_len
+                print(f"    {t['token']:<35} {bar} ({t['type']})")
+
     # Secondary findings (dev mode only)
     if mode == "dev" and len(results) > 1:
         non_zero = [(n, c) for n, c in results[1:] if c >= 0.05]
@@ -296,7 +596,7 @@ def _print_results(
             for name, conf in non_zero[:3]:
                 print(f"    • {name}: {conf:.0%}")
 
-    print(f"{'━' * 56}\n")
+    print(f"{'━' * 64}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -360,11 +660,33 @@ def main() -> None:
         lib     = _build_fast_engine(args.engine)
         results = _fast_predict(tokens, lib)
 
+    # ── Compute explainability (dev mode only) ──────────────────────────────
+    explainability = None
+    if args.mode == "dev":
+        top_class, top_conf = results[0]
+
+        # Per-function patterns
+        per_function = _extract_per_function_patterns(trace)
+
+        # Token importance
+        token_importance = _compute_token_importance(tokens, bundle, top_class)
+
+        # Pattern summary
+        pattern_summary = _generate_pattern_summary(
+            top_class, top_conf, per_function, token_importance
+        )
+
+        explainability = {
+            "per_function": per_function,
+            "token_importance": token_importance,
+            "pattern_summary": pattern_summary,
+        }
+
     # ── Output ───────────────────────────────────────────────────────────────
     if args.json:
         top_class, top_conf = results[0]
         cwe_idx = CLASS_NAMES.index(top_class) if top_class in CLASS_NAMES else -1
-        print(json.dumps({
+        output = {
             "syrth_version": "1.0.0",
             "source": source_label,
             "mode": args.mode,
@@ -378,9 +700,12 @@ def main() -> None:
                 {"class": n, "confidence": round(c, 4)}
                 for n, c in results
             ],
-        }, indent=2))
+        }
+        if explainability:
+            output["explainability"] = explainability
+        print(json.dumps(output, indent=2))
     else:
-        _print_results(results, source_label, args.mode, args.threshold)
+        _print_results(results, source_label, args.mode, args.threshold, explainability)
 
 
 if __name__ == "__main__":
