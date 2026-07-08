@@ -72,7 +72,7 @@ def _fmt_time(s: float) -> str:
 
 # ── Configuration ───────────────────────────────────────────────────────────
 
-NUM_CLASSES = 8
+NUM_CLASSES = 5
 PAD_TOKEN = "<PAD>"
 UNK_TOKEN = "<UNK>"
 MAX_SEQ_LEN = 128
@@ -90,7 +90,7 @@ EARLY_STOP_PATIENCE = 18  # Fewer patience for faster convergence
 
 K_FOLDS = 20
 
-CWE_NAMES = ["SQLi", "XSS", "IDOR", "SSRF", "PathTraversal", "OpenRedirect", "BrokenAuth", "RCE"]
+CWE_NAMES = ["SQLi", "XSS", "PathTraversal", "OpenRedirect", "RCE"]
 
 
 # ── Tokenizer ───────────────────────────────────────────────────────────────
@@ -262,6 +262,7 @@ def train_final(
     epochs: int = DEFAULT_EPOCHS,
     lr: float = DEFAULT_LR,
     device: torch.device | None = None,
+    class_weight: torch.Tensor | None = None,
 ) -> SyrthEncoder:
     """Train model with early stopping based on validation F1."""
     if device is None:
@@ -270,7 +271,8 @@ def train_final(
     model = model.to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=5e-3)  # Stronger regularization
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
-    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
+    weight = class_weight.to(device) if class_weight is not None else None
+    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING, weight=weight)
 
     best_f1 = 0.0
     best_state = None
@@ -421,8 +423,7 @@ def export_c_header(
     vocab_c_ids = ", ".join(str(i) for i in vocab_ids)
 
     cwe_names = [
-        "SQLi", "XSS", "IDOR", "SSRF",
-        "PathTraversal", "OpenRedirect", "BrokenAuth", "RCE",
+        "SQLi", "XSS", "PathTraversal", "OpenRedirect", "RCE",
     ]
 
     lines: list[str] = [
@@ -660,7 +661,7 @@ def train_and_evaluate(
         model = train_final(
             model, train_loader,
             torch.tensor(X_val), torch.tensor(y_val),
-            epochs=DEFAULT_EPOCHS, lr=DEFAULT_LR, device=device
+            epochs=DEFAULT_EPOCHS, lr=DEFAULT_LR, device=device,
         )
 
         # Evaluate

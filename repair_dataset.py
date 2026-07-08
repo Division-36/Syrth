@@ -51,15 +51,15 @@ def _record_hash(r: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-# Only keep tokens that carry security semantics and match the vocabulary
-# syrth_scan.py emits at inference time. Drop free-text `code:` fragments
-# (normalised advisory snippets) — they are high-cardinality noise that does
-# not appear in real code and hurts generalisation.
+# Keep only tokens that syrth_scan.py emits at inference time (def:/arg:/call:/
+# sink:/ret:/@decorator/meta:no_auth) plus text-derived keywords (severity:/framework:).
+# Drop free-text `code:` fragments — they carry advisory-specific patterns that do
+# not appear in real code and hurt generalisation to unseen scanner output.
 _ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "severity", "framework"}
 
 
 def _keep_token(t: str) -> bool:
-    if t.startswith("@"):  # security decorators (@login_required, ...)
+    if t.startswith("@"):
         return True
     return t.split(":", 1)[0] in _ALLOWED_PREFIX
 
@@ -82,31 +82,39 @@ def re_tokenize(records: list[dict]) -> list[dict]:
 
 
 def split_train_test(records: list[dict], ratio: float = RATIO, seed: int = SEED):
-    """Leak-free split keyed on (tokens, label).
+    """Leak-free, stratified train/test split.
 
-    We first identify the set of UNIQUE (tokens, label) sequences, split those
-    by content hash, then assign every record (including duplicates) according
-    to its sequence's membership. A sequence can therefore never appear in both
-    train and test.
+    Splits within each class separately (preserving class proportions), then
+    deduplicates by (tokens, label) hash to guarantee no content leakage.
     """
-    def _key(r: dict) -> tuple:
-        return (json.dumps(r.get("tokens"), sort_keys=True), r.get("label"))
+    rng = random.Random(seed)
 
-    unique = []
-    seen_keys: set = set()
+    def _key(r: dict) -> str:
+        return json.dumps({"tokens": r.get("tokens"), "label": r.get("label")}, sort_keys=True)
+
+    from collections import defaultdict
+    by_label: dict[int, list] = defaultdict(list)
     for r in records:
-        k = _key(r)
-        if k not in seen_keys:
-            seen_keys.add(k)
-            unique.append(r)
+        by_label[r.get("label", 0)].append(r)
 
+    train_keys: set = set()
     test_keys: set = set()
-    for r in unique:
-        if int(_record_hash(r)[:8], 16) % 100 < int(ratio * 100 + 1e-9):
-            test_keys.add(_key(r))
 
-    train = [r for r in records if _key(r) not in test_keys]
-    test = [r for r in records if _key(r) in test_keys]
+    for label, group in by_label.items():
+        seen: dict[str, dict] = {}
+        for r in group:
+            k = _key(r)
+            seen.setdefault(k, r)
+        unique = list(seen.values())
+        rng.shuffle(unique)
+        split = max(1, int(len(unique) * ratio + 0.5))
+        for r in unique[:split]:
+            test_keys.add(_key(r))
+        for r in unique[split:]:
+            train_keys.add(_key(r))
+
+    train = [r for r in records if _key(r) in train_keys]
+    test  = [r for r in records if _key(r) in test_keys]
     return train, test
 
 

@@ -35,22 +35,18 @@ CONFIDENCE_DISCLAIMER = 0.60
 CWE_DESCRIPTIONS: dict[str, str] = {
     "SQLi":          "SQL Injection (CWE-89) — user input reaches raw SQL execution",
     "XSS":           "Cross-Site Scripting (CWE-79) — unsanitised input rendered as HTML",
-    "IDOR":          "Insecure Direct Object Reference (CWE-284) — missing ownership check",
-    "SSRF":          "Server-Side Request Forgery (CWE-918) — attacker-controlled URL fetched",
     "PathTraversal": "Path Traversal (CWE-22) — user input used in filesystem path",
     "OpenRedirect":  "Open Redirect (CWE-601) — user-controlled redirect target",
-    "BrokenAuth":    "Broken Authentication (CWE-287) — missing or weak auth gate",
     "RCE":           "Remote Code Execution (CWE-94) — user input evaluated as code",
 }
 
 CWE_IDS: list[str] = [
-    "CWE-89", "CWE-79", "CWE-284", "CWE-918",
-    "CWE-22", "CWE-601", "CWE-287", "CWE-94",
+    "CWE-89", "CWE-79",
+    "CWE-22", "CWE-601", "CWE-94",
 ]
 
 CLASS_NAMES: list[str] = [
-    "SQLi", "XSS", "IDOR", "SSRF",
-    "PathTraversal", "OpenRedirect", "BrokenAuth", "RCE",
+    "SQLi", "XSS", "PathTraversal", "OpenRedirect", "RCE",
 ]
 
 # ---------------------------------------------------------------------------

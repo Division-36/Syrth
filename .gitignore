@@ -11,6 +11,29 @@ syrth_model.joblib
 syrth_engine.so
 syrth_engine.h
 
+# Generated datasets (rebuilt by harvester.py / repair_dataset.py / _build_balanced.py)
+_dataset.json
+_full_dataset.json
+_full_dataset_5class.json
+_merged_5class.json
+_fresh_synthetic.json
+_advisory_only.json
+_balanced_dataset.json
+_balanced_new.json
+_testing_new.json
+testingMassiveDataset.json
+benchmark/testingMassiveDataset.json
+
+# Benchmark outputs
+benchmark/metrics.json
+benchmark/results.json
+benchmark/summary.txt
+benchmark/*.png
+
+# Scratch helpers (one-off, not part of the pipeline)
+_merge.py
+
+
 # OS / editor
 .DS_Store
 *.swp
