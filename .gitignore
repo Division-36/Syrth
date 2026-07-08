@@ -22,22 +22,25 @@ _balanced_dataset.json
 _balanced_new.json
 _testing_new.json
 testingMassiveDataset.json
-benchmark/testingMassiveDataset.json
 
-# Benchmark outputs
-benchmark/metrics.json
-benchmark/results.json
-benchmark/summary.txt
-benchmark/*.png
+# Benchmark outputs (old 8-class benchmarks, regenerated per-run)
+benchmark/
+tests/
 
 # Scratch helpers (one-off, not part of the pipeline)
 _merge.py
-
+_audit.py
+__verify_imports.py
+__analyze.py
+__class_dist.py
+check_test.py
+test_dev_fast.py
+test_heldout.py
+test_final.py
+test_vuln.py
+verify_final.py
 
 # OS / editor
 .DS_Store
 *.swp
 *~
-
-# Local temp / verification scratch
-__verify.txt
