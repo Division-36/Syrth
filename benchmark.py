@@ -225,7 +225,7 @@ def load_dataset_strict_split(test_ratio: float = 0.2, seed: int = 42) -> Tuple[
     train_indices = indices[n_test:]  # These were used for training
     
     # Convert to samples
-    cwe_names = ["SQLi", "XSS", "IDOR", "SSRF", "PathTraversal", "OpenRedirect", "BrokenAuth", "RCE"]
+    cwe_names = ["SQLi", "XSS", "PathTraversal", "OpenRedirect", "RCE"]
     
     test_samples = []
     class_dist = defaultdict(int)
@@ -960,7 +960,7 @@ def generate_summary(python_results: Dict, c_results: Dict) -> str:
         L("")
         L("  Per-Class Accuracy:")
         per_class = python_results.get("per_class_accuracy", {})
-        cwe_names = ["SQLi", "XSS", "IDOR", "SSRF", "PathTraversal", "OpenRedirect", "BrokenAuth", "RCE"]
+        cwe_names = ["SQLi", "XSS", "PathTraversal", "OpenRedirect", "RCE"]
         for k, v in sorted(per_class.items()):
             class_idx = int(k.replace("class_", ""))
             name = cwe_names[class_idx] if class_idx < len(cwe_names) else f"Class{class_idx}"
