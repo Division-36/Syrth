@@ -1480,10 +1480,19 @@ def _build_advisory_tokens(description: str, severity: str, cwe_id: str) -> list
     """Prefer code-derived (inference-aligned) tokens; fall back to text tokens."""
     code_tokens = _tokens_from_advisory_code(description)
     if code_tokens:
-        sev = (severity or "").lower()
-        if sev in ("critical", "high", "moderate", "low"):
-            code_tokens = code_tokens + [f"severity:{sev}"]
-        return code_tokens
+        # Keep only AST-derived tokens (def:/arg:/sink:/call:/ret:/@/meta:)
+        # Discard code: text tokens — they don't match syrth_scan.py inference vocabulary
+        ast_prefixes = ("def:", "arg:", "sink:", "call:", "ret:", "@", "meta:")
+        ast_tokens = [t for t in code_tokens if t.startswith(ast_prefixes)]
+        if len(ast_tokens) >= 3:
+            if isinstance(severity, dict):
+                severity = severity.get("type", "")
+            elif isinstance(severity, list):
+                severity = severity[0] if severity else ""
+            sev = str(severity or "").lower()
+            if sev in ("critical", "high", "moderate", "low"):
+                ast_tokens = ast_tokens + [f"severity:{sev}"]
+            return ast_tokens
     return _tokenise_description(description, cwe_id)
 
 
@@ -1537,7 +1546,7 @@ def fetch_osv_records(max_entries: int = 10000) -> list[dict[str, Any]]:
                     continue
 
                 description = osv.get("summary", "") + "\n" + osv.get("details", "")
-                tokens = _tokenise_description(description, cwe_id)
+                tokens = _build_advisory_tokens(description, osv.get("severity", ""), cwe_id)
 
                 records.append({
                     "source": "osv",
