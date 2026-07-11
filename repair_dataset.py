@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -51,17 +52,55 @@ def _record_hash(r: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-# Keep only tokens that syrth_scan.py emits at inference time (def:/arg:/call:/
-# sink:/ret:/@decorator/meta:no_auth) plus text-derived keywords (severity:/framework:).
-# Drop free-text `code:` fragments — they carry advisory-specific patterns that do
-# not appear in real code and hurt generalisation to unseen scanner output.
-_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "severity", "framework"}
+# Keep tokens that syrth_scan.py emits at inference time (def:/arg:/call:/
+# sink:/ret:/@decorator/meta:no_auth/flow:) plus text-derived keywords
+# (severity:/framework:) and advisory description words (txt:). We deliberately
+# NOT include the label (cwe:) — that would leak the answer.
+_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "severity", "framework", "txt"}
+
+_STOP = set(
+    "the a an and or of to in for with on by from at as is are be was were this that "
+    "which it its their our your his her they them we you i he she but if then than so "
+    "can may might could would should will can not no yes has have had do does did using "
+    "used use via when where while who whom how what why into out over under between about "
+    "after before during within without within such same other more most some any all each "
+    "one two three new old first last per via also e.g i.e etc via due caused cause causes "
+    "issue issues problem problems vulnerability vulnerabilities security affected affecting "
+    "version versions package project library application code user users attacker remote "
+    "possible potentially allow allows allowing leading lead leads execution execute executed "
+    "request requests response server client input parameter parameters value values data file "
+    "files system systems function functions call calls result resulting access controlled "
+    "control arbitrary able ability perform performs performed command commands process context "
+    "certain specific given provided passed passed directly indirectly occur occurs occurring "
+    "found report reports disclosed public known unknown related relation send sending receive "
+    "handling handle handled invalid valid normal malicious crafted special supplied provided"
+    .split()
+)
 
 
 def _keep_token(t: str) -> bool:
     if t.startswith("@"):
         return True
     return t.split(":", 1)[0] in _ALLOWED_PREFIX
+
+
+def _desc_tokens(description: str, limit: int = 80) -> list[str]:
+    """Honest, non-label description words as `txt:` features.
+
+    These describe the vulnerability in the advisory text (e.g. 'injection',
+    'script', 'redirect', 'deserialization') and are legitimate signals for
+    classifying an advisory. The ground-truth CWE label is NEVER included.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for w in re.findall(r"[a-z]{3,}", description.lower()):
+        if w in _STOP or w in seen:
+            continue
+        seen.add(w)
+        out.append(f"txt:{w}")
+        if len(out) >= limit:
+            break
+    return out
 
 
 def re_tokenize(records: list[dict]) -> list[dict]:
@@ -71,6 +110,8 @@ def re_tokenize(records: list[dict]) -> list[dict]:
         desc = r.get("description") or r.get("summary") or ""
         toks = H._build_advisory_tokens(desc, r.get("severity", ""), r.get("cwe_id", ""))
         toks = [t for t in toks if _keep_token(t)]
+        # Advisory description text as honest (non-label) signal.
+        toks = toks + _desc_tokens(desc)
         if not toks:
             skipped += 1
             continue

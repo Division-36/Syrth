@@ -1482,7 +1482,7 @@ def _build_advisory_tokens(description: str, severity: str, cwe_id: str) -> list
     if code_tokens:
         # Keep only AST-derived tokens (def:/arg:/sink:/call:/ret:/@/meta:)
         # Discard code: text tokens — they don't match syrth_scan.py inference vocabulary
-        ast_prefixes = ("def:", "arg:", "sink:", "call:", "ret:", "@", "meta:")
+        ast_prefixes = ("def:", "arg:", "sink:", "call:", "ret:", "@", "meta:", "flow:")
         ast_tokens = [t for t in code_tokens if t.startswith(ast_prefixes)]
         if len(ast_tokens) >= 3:
             if isinstance(severity, dict):

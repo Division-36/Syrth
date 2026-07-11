@@ -35,25 +35,38 @@ from typing import Any
 
 SINK_REGISTRY: frozenset[str] = frozenset({
     # SQL execution
-    "execute", "executemany", "raw", "RawSQL", "extra",
+    "execute", "executemany", "raw", "RawSQL", "extra", "cursor.execute",
+    "connection.execute", "Model.objects.raw",
     # OS / subprocess
     "os.system", "subprocess.run", "subprocess.call", "subprocess.Popen",
-    "popen",
+    "subprocess.getoutput", "subprocess.getstatusoutput", "popen", "os.popen",
+    "commands.getoutput", "commands.getstatusoutput", "popen2", "popen3", "popen4",
+    "os.execv", "os.execl", "os.execve", "os.execvp", "os.execvpe",
     # Code execution
-    "eval", "exec", "compile",
+    "eval", "exec", "compile", "execfile", "__import__", "os.system",
     # Template rendering / XSS
-    "render", "render_to_string", "mark_safe", "SafeString",
+    "render", "render_to_string", "render_to_response", "mark_safe", "SafeString",
+    "render_template", "render_template_string", "make_response", "Response",
+    "HttpResponse", "JsonResponse", "jsonify", "HTMLResponse", "TemplateResponse",
+    "format_html", "autoescape_off",
     # File system
-    "open", "os.path.join", "shutil.copy", "shutil.move",
+    "open", "io.open", "codecs.open", "os.path.join", "os.path.abspath",
+    "shutil.copy", "shutil.move", "shutil.rmtree", "os.remove", "os.unlink",
+    "send_file", "send_from_directory", "FileResponse", "os.makedirs",
     # Network / SSRF
-    "requests.get", "requests.post", "httpx.get", "httpx.post",
-    "urllib.request.urlopen",
+    "requests.get", "requests.post", "requests.put", "requests.delete",
+    "requests.patch", "requests.head", "requests.request",
+    "httpx.get", "httpx.post", "httpx.put", "httpx.request",
+    "urllib.request.urlopen", "aiohttp.request", "urlopen", "socket.create_connection",
     # Redirect
-    "redirect", "HttpResponseRedirect",
+    "redirect", "HttpResponseRedirect", "HttpResponsePermanentRedirect",
+    "RedirectResponse", "return HttpResponseRedirect",
     # Deserialization
-    "pickle.loads", "yaml.load", "marshal.loads",
+    "pickle.loads", "pickle.load", "cPickle.loads", "yaml.load", "yaml.full_load",
+    "yaml.unsafe_load", "marshal.loads", "marshal.load", "jsonpickle.decode",
+    "numpy.load", "torch.load",
     # Auth signals
-    "is_authenticated", "has_perm", "get_object_or_404",
+    "is_authenticated", "has_perm", "get_object_or_404", "login", "authenticate",
 })
 
 # ---------------------------------------------------------------------------
@@ -143,17 +156,26 @@ _HIGH_RISK_SINKS: frozenset[str] = frozenset({
 # ---------------------------------------------------------------------------
 
 _TOKEN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\b(user_?id|uid|user\.id|request\.user\.pk|user\.pk|owner_id|author_id)\b"), "<USER_ID>"),
+    (re.compile(r"\b(user_?id|uid|user\.id|request\.user\.pk|user\.pk|owner_id|author_id|self\.user\.pk|self\.user\.id)\b"), "<USER_ID>"),
     (re.compile(r"\b(pk|object_id|obj_id|item_id|record_id|document_id|doc_id)\b"),           "<OBJ_ID>"),
-    (re.compile(r"\b(request\.(GET|POST|data|body|query_params|form|args|json|values|files|headers))\b"), "<REQUEST_INPUT>"),
+    (re.compile(r"(self\.)?request\.(GET|POST|data|body|query_params|form|args|json|values|files|headers)"), "<REQUEST_INPUT>"),
+    (re.compile(r"\b(req|request)\b"), "<REQUEST_INPUT>"),
+    (re.compile(r"\b(self\.)?user\b"), "<USER_ID>"),
     (re.compile(r"\b(password|passwd|secret|token|api_key|auth_token|access_token|private_key|credential)\b"), "<SECRET>"),
-    (re.compile(r"\b(file_?path|filepath|upload_?path|filename|file_name|directory|dir_path)\b"), "<FILE_PATH>"),
-    (re.compile(r"\b(url|redirect_url|next|callback_url|target|destination|href|location|return_url|next_url)\b"), "<URL_PARAM>"),
+    (re.compile(r"\b(file_?path|filepath|upload_?path|filename|file_name|directory|dir_path|path|upload_path)\b"), "<FILE_PATH>"),
+    (re.compile(r"\b(url|redirect_url|next|callback_url|target|destination|href|location|return_url|next_url|redirect|url_path)\b"), "<URL_PARAM>"),
     (re.compile(r"\b(command|cmd|shell_cmd|exec_cmd|command_str)\b"), "<CMD>"),
     (re.compile(r"\b(query|sql|sql_query|raw_query|statement|sql_str)\b"), "<SQL>"),
     (re.compile(r"\"[^\"]{0,120}\"|'[^']{0,120}'"), "<STR_LITERAL>"),
     (re.compile(r"\b\d+\b"), "<INT_LITERAL>"),
 ]
+
+# Normalised token values that represent user-controlled or sensitive inputs.
+# Used to emit data-flow tokens (flow:<SOURCE>-><SINK>) in to_token_sequence().
+_SOURCE_TOKEN_VALUES: frozenset[str] = frozenset({
+    "<REQUEST_INPUT>", "<USER_ID>", "<OBJ_ID>", "<SECRET>",
+    "<FILE_PATH>", "<URL_PARAM>", "<CMD>", "<SQL>",
+})
 
 _SQL_KEYWORDS: tuple[str, ...] = (
     "SELECT ", "INSERT INTO", "UPDATE ", "DELETE FROM",
@@ -183,6 +205,7 @@ class FunctionTrace:
     calls: list[str] = field(default_factory=list)
     sinks: list[str] = field(default_factory=list)   # canonical sink names
     returns: list[str] = field(default_factory=list)
+    flows: list[str] = field(default_factory=list)   # taint edges: flow:<SRC>-><SINK>
     has_sql_string: bool = False
     has_auth_decorator: bool = False
     has_csrf_exempt: bool = False
@@ -192,6 +215,7 @@ class FunctionTrace:
         """
         Flatten into normalised token sequence (training-compatible format):
             @decorator  def:name  arg:name  call:name  sink:name  ret:name
+            flow:<SOURCE>-><SINK>   (data-flow edge: user input reaches a sink)
 
         ⚠ Called by diff_traces() which harvester uses for synthetic record
           generation. This format must stay compatible with training vocabulary.
@@ -223,6 +247,14 @@ class FunctionTrace:
         if self.sinks and not self.has_auth_decorator:
             tokens.append("meta:no_auth")
 
+        # ── Data-flow tokens ──────────────────────────────────────────────
+        # Taint edges computed by TraceVisitor: a user-controlled / sensitive
+        # input reaches a dangerous sink (e.g. flow:<REQUEST_INPUT>->execute).
+        # This captures the *vulnerability pattern* that flat Bag-of-Words
+        # tokens alone cannot express.
+        for flow in self.flows:
+            tokens.append(flow)
+
         return tokens
 
 
@@ -243,6 +275,7 @@ class TraceVisitor(ast.NodeVisitor):
     def __init__(self, source_path: str) -> None:
         self.file_trace = FileTrace(path=source_path)
         self._current_func: FunctionTrace | None = None
+        self._taint: dict[str, str] = {}
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -292,11 +325,17 @@ class TraceVisitor(ast.NodeVisitor):
         for arg in all_args:
             if arg.arg not in ("self", "cls"):
                 trace.args.append(arg.arg)
+                norm = normalise_token(arg.arg)
+                if norm in _SOURCE_TOKEN_VALUES:
+                    self._taint[arg.arg] = norm
 
         parent = self._current_func
+        parent_taint = self._taint
         self._current_func = trace
+        self._taint = {}
         self.generic_visit(node)
         self._current_func = parent
+        self._taint = parent_taint
 
         self.file_trace.functions.append(trace)
 
@@ -335,6 +374,56 @@ class TraceVisitor(ast.NodeVisitor):
         if canonical is not None and canonical not in self._current_func.sinks:
             self._current_func.sinks.append(canonical)
 
+        # 4. Taint flow: does a user-controlled / sensitive input reach this sink?
+        if canonical is not None:
+            for arg in node.args:
+                self._emit_flow_if_tainted(arg, canonical)
+            for kw in node.keywords:
+                if kw.arg is None:  # **kwargs passthrough
+                    continue
+                self._emit_flow_if_tainted(kw.value, canonical)
+
+        self.generic_visit(node)
+
+    def _source_token_of(self, node: ast.expr) -> str | None:
+        """Return the normalised source token for an expression, or None."""
+        name = self._resolve_name(node)
+        if name:
+            norm = normalise_token(name)
+            if norm in _SOURCE_TOKEN_VALUES:
+                return norm
+        return None
+
+    def _emit_flow_if_tainted(self, arg_node: ast.expr, sink_canonical: str) -> None:
+        trace = self._current_func
+        if trace is None:
+            return
+        src = self._source_token_of(arg_node)
+        if src is None and isinstance(arg_node, ast.Name) and arg_node.id in self._taint:
+            src = self._taint[arg_node.id]
+        if src is not None:
+            tok = f"flow:{src}->{sink_canonical}"
+            if tok not in trace.flows:
+                trace.flows.append(tok)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if self._current_func is not None:
+            src = self._source_token_of(node.value)
+            if src is None and isinstance(node.value, ast.Name) and node.value.id in self._taint:
+                src = self._taint[node.value.id]
+            if src is not None:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        self._taint[target.id] = src
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if self._current_func is not None and node.value is not None:
+            src = self._source_token_of(node.value)
+            if src is None and isinstance(node.value, ast.Name) and node.value.id in self._taint:
+                src = self._taint[node.value.id]
+            if src is not None and isinstance(node.target, ast.Name):
+                self._taint[node.target.id] = src
         self.generic_visit(node)
 
     def visit_Return(self, node: ast.Return) -> None:

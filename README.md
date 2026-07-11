@@ -129,16 +129,35 @@ Produces:
 
 ### Results
 
+SYRTH is validated on **real GitHub advisory data** (OSV PyPI bulk corpus, 2,299
+records, 5 CWE classes), with a strict leak-free train/test split (0 overlapping
+records, no label leakage).
+
+**Trained and tested on real advisories** (`repair_dataset.py` → `train_model.py`):
+
 | Metric | Value |
 |---|---|
-| Held-out test accuracy | **96.94%** (95/98) |
-| SQLi | 100% |
-| XSS | 100% |
-| PathTraversal | 90.5% |
-| OpenRedirect | 100% |
-| RCE | 95% |
+| Held-out test accuracy | **91.6%** (440 records) |
+| SQLi | 83.3% |
+| XSS | 97.3% |
+| PathTraversal | 81.4% |
+| OpenRedirect | 85.0% |
+| RCE | 94.8% |
 | Leakage | 0 records |
 | Dev/Fast agreement | 100% |
+
+**Code-only validation** (synthetic code-derived training, evaluated on real
+source files in `RLTESTS/`): 97.0% synthetic held-out, **100% on real code
+(6/6)**. This confirms the scanner generalises to complete source code.
+
+> ⚠ **Honesty note:** An earlier 99% figure was invalid — it came from a
+> train/test split that reused identical records *and* leaked the label
+> (`cwe:` token) into the features. Both issues are fixed. The numbers above
+> are from leak-free splits with the label excluded from features.
+
+The real-advisory model uses advisory description text (`txt:` features) as
+honest, non-label signal. For pure source-code scanning (no description
+available), train with `_build_synthetic.py` and validate via `RLTESTS/`.
 
 ---
 
