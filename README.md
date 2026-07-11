@@ -135,14 +135,18 @@ records, no label leakage).
 
 **Trained and tested on real advisories** (`repair_dataset.py` → `train_model.py`):
 
+The train/test split is keyed on the stable advisory identity (`ghsa_id`) and
+stratified per class, so the benchmark is reproducible and leak-free (0
+overlapping records, label excluded from features).
+
 | Metric | Value |
 |---|---|
-| Held-out test accuracy | **91.6%** (440 records) |
-| SQLi | 83.3% |
-| XSS | 97.3% |
-| PathTraversal | 81.4% |
-| OpenRedirect | 85.0% |
-| RCE | 94.8% |
+| Held-out test accuracy | **90.4%** (353 records, stable split) |
+| SQLi | 63.6% |
+| XSS | 92.0% |
+| PathTraversal | 92.6% |
+| OpenRedirect | 88.9% |
+| RCE | 92.4% |
 | Leakage | 0 records |
 | Dev/Fast agreement | 100% |
 

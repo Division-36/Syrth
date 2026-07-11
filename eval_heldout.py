@@ -68,6 +68,7 @@ def main() -> int:
     per_class_total = np.zeros(NUM_CLASSES, dtype=int)
     per_class_correct = np.zeros(NUM_CLASSES, dtype=int)
     pred_counts = np.zeros(NUM_CLASSES, dtype=int)
+    y_true, y_pred = [], []
 
     with torch.no_grad():
         for toks, label in samples:
@@ -75,6 +76,8 @@ def main() -> int:
             x = torch.tensor([ids], dtype=torch.long)
             probs = torch.softmax(model(x), dim=-1)[0].numpy()
             pred = int(np.argmax(probs))
+            y_true.append(label)
+            y_pred.append(pred)
             if pred == label:
                 correct += 1
                 per_class_correct[label] += 1
@@ -96,6 +99,13 @@ def main() -> int:
     print("Predicted class distribution:")
     for i, name in enumerate(CLASS_NAMES):
         print(f"  {name:<14} {pred_counts[i]:5d}  ({pred_counts[i] / n * 100:.1f}%)")
+
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(NUM_CLASSES)))
+    print("\nConfusion matrix (rows=true, cols=pred):")
+    print("        " + "  ".join(f"{name[:4]:>4}" for name in CLASS_NAMES))
+    for i, name in enumerate(CLASS_NAMES):
+        print(f"  {name[:4]:>4}  " + "  ".join(f"{cm[i][j]:4d}" for j in range(NUM_CLASSES)))
 
     return 0
 

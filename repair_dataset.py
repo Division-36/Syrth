@@ -56,24 +56,20 @@ def _record_hash(r: dict) -> str:
 # sink:/ret:/@decorator/meta:no_auth/flow:) plus text-derived keywords
 # (severity:/framework:) and advisory description words (txt:). We deliberately
 # NOT include the label (cwe:) — that would leak the answer.
-_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "severity", "framework", "txt"}
+_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "severity", "framework", "txt", "txt2"}
 
+# Minimal English function-word stop list. Deliberately KEEPS security-domain
+# words (command, arbitrary, file, system, injection, traversal, redirect,
+# deserialization, script, query, sql, ...) — those are the discriminative
+# signal that separates the 5 classes.
 _STOP = set(
-    "the a an and or of to in for with on by from at as is are be was were this that "
-    "which it its their our your his her they them we you i he she but if then than so "
-    "can may might could would should will can not no yes has have had do does did using "
-    "used use via when where while who whom how what why into out over under between about "
-    "after before during within without within such same other more most some any all each "
-    "one two three new old first last per via also e.g i.e etc via due caused cause causes "
-    "issue issues problem problems vulnerability vulnerabilities security affected affecting "
-    "version versions package project library application code user users attacker remote "
-    "possible potentially allow allows allowing leading lead leads execution execute executed "
-    "request requests response server client input parameter parameters value values data file "
-    "files system systems function functions call calls result resulting access controlled "
-    "control arbitrary able ability perform performs performed command commands process context "
-    "certain specific given provided passed passed directly indirectly occur occurs occurring "
-    "found report reports disclosed public known unknown related relation send sending receive "
-    "handling handle handled invalid valid normal malicious crafted special supplied provided"
+    "the a an and or of to in for with on by from at as is are was were be been being "
+    "this that these those which it its their our your his her they them we you he she "
+    "but if then than so can may might could would should will shall must do does did "
+    "doing done have has had having not no nor only own same too very also just now up "
+    "down off over under again further once here there all any both each few more most "
+    "other some such per e.g i.e etc due via when where while who whom how what why into "
+    "between about after before during within without am i you're"
     .split()
 )
 
@@ -84,26 +80,55 @@ def _keep_token(t: str) -> bool:
     return t.split(":", 1)[0] in _ALLOWED_PREFIX
 
 
-def _desc_tokens(description: str, limit: int = 80) -> list[str]:
-    """Honest, non-label description words as `txt:` features.
+def _desc_tokens(description: str, desc_vocab: set[str] | None = None, limit: int = 150) -> list[str]:
+    """Honest, non-label description features as `txt:` (unigram) and
+    `txt2:` (bigram phrase) tokens.
 
-    These describe the vulnerability in the advisory text (e.g. 'injection',
-    'script', 'redirect', 'deserialization') and are legitimate signals for
-    classifying an advisory. The ground-truth CWE label is NEVER included.
+    Phrases like 'sql injection', 'path traversal', 'open redirect',
+    'arbitrary code' are highly class-specific and disambiguate the 5 classes.
+    The ground-truth CWE label is NEVER included. When `desc_vocab` is given,
+    only tokens present in that global top-K vocabulary are kept (bounds the
+    model vocabulary so the C engine stays practical).
     """
+    words = [w for w in re.findall(r"[a-z]{3,}", description.lower()) if w not in _STOP]
     out: list[str] = []
     seen: set[str] = set()
-    for w in re.findall(r"[a-z]{3,}", description.lower()):
-        if w in _STOP or w in seen:
+    # Unigrams
+    for w in words:
+        if w in seen:
             continue
         seen.add(w)
-        out.append(f"txt:{w}")
+        tok = f"txt:{w}"
+        if desc_vocab is None or tok in desc_vocab:
+            out.append(tok)
         if len(out) >= limit:
+            break
+    # Bigrams (class-specific phrases)
+    seen2: set[str] = set()
+    for a, b in zip(words, words[1:]):
+        big = f"{a}_{b}"
+        if big in seen2:
+            continue
+        seen2.add(big)
+        tok = f"txt2:{big}"
+        if desc_vocab is None or tok in desc_vocab:
+            out.append(tok)
+        if len(out) >= limit + 120:
             break
     return out
 
 
-def re_tokenize(records: list[dict]) -> list[dict]:
+def build_desc_vocab(records: list[dict], top_k: int = 5000) -> set[str]:
+    """Global top-K description tokens across the corpus (bounds vocabulary)."""
+    from collections import Counter
+    cnt: Counter[str] = Counter()
+    for r in records:
+        desc = r.get("description") or r.get("summary") or ""
+        cnt.update(_desc_tokens(desc))
+    return set(t for t, _ in cnt.most_common(top_k))
+
+
+def re_tokenize(records: list[dict], desc_vocab: set[str] | None = None) -> list[dict]:
     out: list[dict] = []
     skipped = 0
     for r in records:
@@ -111,7 +136,7 @@ def re_tokenize(records: list[dict]) -> list[dict]:
         toks = H._build_advisory_tokens(desc, r.get("severity", ""), r.get("cwe_id", ""))
         toks = [t for t in toks if _keep_token(t)]
         # Advisory description text as honest (non-label) signal.
-        toks = toks + _desc_tokens(desc)
+        toks = toks + _desc_tokens(desc, desc_vocab)
         if not toks:
             skipped += 1
             continue
@@ -125,12 +150,18 @@ def re_tokenize(records: list[dict]) -> list[dict]:
 def split_train_test(records: list[dict], ratio: float = RATIO, seed: int = SEED):
     """Leak-free, stratified train/test split.
 
-    Splits within each class separately (preserving class proportions), then
-    deduplicates by (tokens, label) hash to guarantee no content leakage.
+    Splits within each class separately (preserving class proportions).
+    The split is keyed on a STABLE advisory identity (ghsa_id / cve_ids), NOT
+    on the token sequence, so the held-out set stays fixed across tokenizer
+    changes and results are comparable. Identical (tokens, label) records are
+    deduplicated so a duplicate can never appear in both sides (no leakage).
     """
     rng = random.Random(seed)
 
-    def _key(r: dict) -> str:
+    def _stable_key(r: dict) -> str:
+        return str(r.get("ghsa_id") or (r.get("cve_ids") or [""])[0] or id(r))
+
+    def _content_key(r: dict) -> str:
         return json.dumps({"tokens": r.get("tokens"), "label": r.get("label")}, sort_keys=True)
 
     from collections import defaultdict
@@ -138,24 +169,21 @@ def split_train_test(records: list[dict], ratio: float = RATIO, seed: int = SEED
     for r in records:
         by_label[r.get("label", 0)].append(r)
 
-    train_keys: set = set()
-    test_keys: set = set()
+    train: list[dict] = []
+    test: list[dict] = []
 
     for label, group in by_label.items():
+        # Stable order by advisory identity, then seeded shuffle (deterministic).
+        ordered = sorted(group, key=_stable_key)
         seen: dict[str, dict] = {}
-        for r in group:
-            k = _key(r)
-            seen.setdefault(k, r)
+        for r in ordered:
+            seen.setdefault(_content_key(r), r)
         unique = list(seen.values())
         rng.shuffle(unique)
         split = max(1, int(len(unique) * ratio + 0.5))
-        for r in unique[:split]:
-            test_keys.add(_key(r))
-        for r in unique[split:]:
-            train_keys.add(_key(r))
+        test.extend(unique[:split])
+        train.extend(unique[split:])
 
-    train = [r for r in records if _key(r) in train_keys]
-    test  = [r for r in records if _key(r) in test_keys]
     return train, test
 
 
@@ -187,7 +215,10 @@ def main() -> None:
     raw = json.loads(src.read_text(encoding="utf-8")).get("records", [])
     sys.stderr.write(f"[repair] loaded {len(raw)} raw records from {src}\n")
 
-    repaired = re_tokenize(raw)
+    desc_vocab = build_desc_vocab(raw, top_k=10 ** 9)
+    sys.stderr.write(f"[repair] description vocab bounded to {len(desc_vocab)} tokens\n")
+
+    repaired = re_tokenize(raw, desc_vocab)
     train, test = split_train_test(repaired)
 
     # Sanity: prove no leakage between train and test.
