@@ -28,17 +28,22 @@ Defaults: _full_dataset.json -> _balanced_dataset.json + testingMassiveDataset.j
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import random
 import re
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", category=SyntaxWarning)
 
 import harvester as H
 
 RATIO = 0.2
 SEED = 42
+DEFAULT_TOP_K = 30000
 
 
 def _record_hash(r: dict) -> str:
@@ -137,6 +142,10 @@ def re_tokenize(records: list[dict], desc_vocab: set[str] | None = None) -> list
         toks = [t for t in toks if _keep_token(t)]
         # Advisory description text as honest (non-label) signal.
         toks = toks + _desc_tokens(desc, desc_vocab)
+        if not toks and r.get("tokens"):
+            # No description (e.g. synthetic code-only records): preserve the
+            # original code-derived tokens so the inference vocabulary survives.
+            toks = [t for t in r["tokens"] if _keep_token(t)]
         if not toks:
             skipped += 1
             continue
@@ -204,9 +213,17 @@ def _pack(records: list[dict]) -> dict:
 
 
 def main() -> None:
-    src = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("_full_dataset.json")
-    train_out = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("_balanced_dataset.json")
-    test_out = Path(sys.argv[3]) if len(sys.argv) > 3 else Path("testingMassiveDataset.json")
+    ap = argparse.ArgumentParser(description="Repair/re-tokenise a SYRTH dataset into leak-free train/test.")
+    ap.add_argument("--src", default="_full_dataset_5class.json")
+    ap.add_argument("--train", default="_balanced_dataset.json")
+    ap.add_argument("--test", default="testingMassiveDataset.json")
+    ap.add_argument("--top-k", type=int, default=DEFAULT_TOP_K,
+                    help="Bound description vocabulary to top-K tokens (keeps C engine practical).")
+    args = ap.parse_args()
+
+    src = Path(args.src)
+    train_out = Path(args.train)
+    test_out = Path(args.test)
 
     if not src.exists():
         sys.stderr.write(f"[repair] source not found: {src}\n")
@@ -215,8 +232,8 @@ def main() -> None:
     raw = json.loads(src.read_text(encoding="utf-8")).get("records", [])
     sys.stderr.write(f"[repair] loaded {len(raw)} raw records from {src}\n")
 
-    desc_vocab = build_desc_vocab(raw, top_k=10 ** 9)
-    sys.stderr.write(f"[repair] description vocab bounded to {len(desc_vocab)} tokens\n")
+    desc_vocab = build_desc_vocab(raw, top_k=args.top_k)
+    sys.stderr.write(f"[repair] description vocab bounded to {len(desc_vocab)} tokens (top_k={args.top_k})\n")
 
     repaired = re_tokenize(raw, desc_vocab)
     train, test = split_train_test(repaired)
@@ -225,6 +242,12 @@ def main() -> None:
     train_hashes = {_record_hash(r) for r in train}
     leaked = sum(1 for r in test if _record_hash(r) in train_hashes)
     sys.stderr.write(f"[repair] leakage check: {leaked} test samples also in train\n")
+
+    # Windows/DrvFS rejects truncating+rewriting a large existing file (EINVAL),
+    # so unlink first.
+    for p in (train_out, test_out):
+        if p.exists():
+            p.unlink()
 
     train_out.write_text(json.dumps(_pack(train), indent=2), encoding="utf-8")
     test_out.write_text(json.dumps(_pack(test), indent=2), encoding="utf-8")

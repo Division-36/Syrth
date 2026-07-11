@@ -141,14 +141,15 @@ overlapping records, label excluded from features).
 
 | Metric | Value |
 |---|---|
-| Held-out test accuracy | **90.4%** (353 records, stable split) |
-| SQLi | 63.6% |
-| XSS | 92.0% |
-| PathTraversal | 92.6% |
-| OpenRedirect | 88.9% |
-| RCE | 92.4% |
+| Held-out test accuracy | **93.5%** (972 records, stable split) |
+| SQLi | 82.0% |
+| XSS | 96.5% |
+| PathTraversal | 89.5% |
+| OpenRedirect | 94.2% |
+| RCE | 94.9% |
 | Leakage | 0 records |
 | Dev/Fast agreement | 100% |
+| Training data | **16,940 real PyPI advisories** (OSV bulk feed, all packages) + 554 synthetic code templates, balanced to 5,669 records |
 
 **Code-only validation** (synthetic code-derived training, evaluated on real
 source files in `RLTESTS/`): 97.0% synthetic held-out, **100% on real code

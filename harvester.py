@@ -1496,22 +1496,37 @@ def _build_advisory_tokens(description: str, severity: str, cwe_id: str) -> list
     return _tokenise_description(description, cwe_id)
 
 
-def fetch_osv_records(max_entries: int = 10000) -> list[dict[str, Any]]:
+def fetch_osv_records(max_entries: int = 600000) -> list[dict[str, Any]]:
     """
     Download the OSV PyPI bulk ZIP (~50MB) and extract matching records.
-    No auth token required. Returns [] on any network error.
+
+    Unlike the early prototype this harvests ALL PyPI packages (not just a
+    hand-picked web/security allowlist) so we collect the largest possible
+    body of real vulnerability advisories. No auth token required.
+    Returns [] on any network error.
     """
     if not _REQUESTS_OK:
         sys.stderr.write("[SYRTH harvester] requests not installed — skipping OSV.\n")
         return []
 
     sys.stderr.write(f"[SYRTH harvester] Downloading OSV PyPI feed from {_OSV_PIP_ZIP} ...\n")
-    try:
-        resp = requests.get(_OSV_PIP_ZIP, timeout=120, stream=True)
-        resp.raise_for_status()
-        raw = resp.content
-    except requests.RequestException as exc:
-        sys.stderr.write(f"[SYRTH harvester] OSV download failed: {exc}\n")
+    raw: bytes | None = None
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get(_OSV_PIP_ZIP, timeout=(30, 600), stream=True)
+            resp.raise_for_status()
+            chunks: list[bytes] = []
+            for chunk in resp.iter_content(chunk_size=1 << 20):
+                if chunk:
+                    chunks.append(chunk)
+            raw = b"".join(chunks)
+            break
+        except requests.RequestException as exc:
+            sys.stderr.write(
+                f"[SYRTH harvester] OSV download attempt {attempt} failed: {exc}\n"
+            )
+    if raw is None:
+        sys.stderr.write("[SYRTH harvester] OSV download failed after retries.\n")
         return []
 
     records: list[dict[str, Any]] = []
@@ -1527,10 +1542,10 @@ def fetch_osv_records(max_entries: int = 10000) -> list[dict[str, Any]]:
                 except json.JSONDecodeError:
                     continue
 
-                # Package filter
+                # Package gate: must affect at least one PyPI package.
                 affected = osv.get("affected", [])
                 pkgs = [a.get("package", {}).get("name", "") for a in affected]
-                if not any(_TARGET_PKGS.search(p) for p in pkgs):
+                if not pkgs:
                     continue
 
                 # CWE resolution
@@ -1546,17 +1561,22 @@ def fetch_osv_records(max_entries: int = 10000) -> list[dict[str, Any]]:
                     continue
 
                 description = osv.get("summary", "") + "\n" + osv.get("details", "")
+                ghsa = osv.get("id", "")
+                cve_ids = [a for a in osv.get("aliases", []) if isinstance(a, str) and a.startswith("CVE")]
                 tokens = _build_advisory_tokens(description, osv.get("severity", ""), cwe_id)
 
                 records.append({
                     "source": "osv",
-                    "osv_id": osv.get("id", ""),
+                    "osv_id": ghsa,
+                    "ghsa_id": ghsa,
+                    "cve_ids": cve_ids,
                     "packages": pkgs,
                     "cwe_id": cwe_id,
                     "cwe_name": CWE_NAMES[cwe_id],
                     "label": CWE_LABELS[cwe_id],
                     "tokens": tokens,
                     "summary": osv.get("summary", ""),
+                    "description": description,
                 })
 
     except zipfile.BadZipFile as exc:
