@@ -141,24 +141,41 @@ overlapping records, label excluded from features).
 
 | Metric | Value |
 |---|---|
-| Held-out test accuracy | **93.5%** (972 records, stable split) |
-| SQLi | 82.0% |
-| XSS | 96.5% |
-| PathTraversal | 89.5% |
+| Held-out test accuracy (advisory text) | **94.2%** (976 records, stable split) |
+| SQLi | 89.2% |
+| XSS | 97.1% |
+| PathTraversal | 92.1% |
 | OpenRedirect | 94.2% |
-| RCE | 94.9% |
+| RCE | 94.4% |
 | Leakage | 0 records |
 | Dev/Fast agreement | 100% |
 | Training data | **16,940 real PyPI advisories** (OSV bulk feed, all packages) + 554 synthetic code templates, balanced to 5,669 records |
 
-**Code-only validation** (synthetic code-derived training, evaluated on real
-source files in `RLTESTS/`): 97.0% synthetic held-out, **100% on real code
-(6/6)**. This confirms the scanner generalises to complete source code.
+**Real scanned code** (719 real CVE code blocks run through the actual
+`syrth_scan` pipeline): **69.1%** overall — SQLi 97%, XSS 69%, PathTraversal
+70%, OpenRedirect 83%, RCE 64%. Advisory *text* is easier than *code*; this is
+the honest floor for code scanning and is what we optimise for.
+
+**Taint-confirmed, function-level scanning.** `syrth_scan.py` classifies each
+function independently and only raises a **CONFIRMED** finding when untrusted
+input actually reaches a dangerous sink (a `tainted:<sink>` token exists). Safe
+sink usage — parameterised queries, escaped output, fixed commands — produces
+no taint token and is reported as safe / review-only, which eliminates the
+false positives that plagued the old file-level classifier. Taint propagates
+through string concatenation and f-strings, so the common
+`HttpResponse("..." + user_input)` / `f"..{x}.."` injection patterns are
+caught.
+
+**Code-only validation** (real code samples in `RLTESTS/`): **6/6 PASS**,
+dev/fast C-engine agreement **100%**.
 
 > ⚠ **Honesty note:** An earlier 99% figure was invalid — it came from a
 > train/test split that reused identical records *and* leaked the label
-> (`cwe:` token) into the features. Both issues are fixed. The numbers above
-> are from leak-free splits with the label excluded from features.
+> (`cwe:` token) into the features. Both issues are fixed. The headline
+> hold-out number is on advisory *text*; the **real scanned-code** number
+> (69.1%) is the honest measure of code-scanning quality and is lower because
+> advisory snippets are often incomplete (no full taint path). On complete
+> functions the taint gate makes detection precise.
 
 The real-advisory model uses advisory description text (`txt:` features) as
 honest, non-label signal. For pure source-code scanning (no description

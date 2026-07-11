@@ -61,7 +61,7 @@ def _record_hash(r: dict) -> str:
 # sink:/ret:/@decorator/meta:no_auth/flow:) plus text-derived keywords
 # (severity:/framework:) and advisory description words (txt:). We deliberately
 # NOT include the label (cwe:) — that would leak the answer.
-_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "severity", "framework", "txt", "txt2"}
+_ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "tainted", "severity", "framework", "txt", "txt2"}
 
 # Minimal English function-word stop list. Deliberately KEEPS security-domain
 # words (command, arbitrary, file, system, injection, traversal, redirect,

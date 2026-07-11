@@ -162,7 +162,7 @@ _TOKEN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b(req|request)\b"), "<REQUEST_INPUT>"),
     (re.compile(r"\b(self\.)?user\b"), "<USER_ID>"),
     (re.compile(r"\b(password|passwd|secret|token|api_key|auth_token|access_token|private_key|credential)\b"), "<SECRET>"),
-    (re.compile(r"\b(file_?path|filepath|upload_?path|filename|file_name|directory|dir_path|path|upload_path)\b"), "<FILE_PATH>"),
+    (re.compile(r"(?<!\.)(file_?path|filepath|upload_?path|filename|file_name|directory_path|dir_path|upload_path)\b"), "<FILE_PATH>"),
     (re.compile(r"\b(url|redirect_url|next|callback_url|target|destination|href|location|return_url|next_url|redirect|url_path)\b"), "<URL_PARAM>"),
     (re.compile(r"\b(command|cmd|shell_cmd|exec_cmd|command_str)\b"), "<CMD>"),
     (re.compile(r"\b(query|sql|sql_query|raw_query|statement|sql_str)\b"), "<SQL>"),
@@ -254,6 +254,20 @@ class FunctionTrace:
         # tokens alone cannot express.
         for flow in self.flows:
             tokens.append(flow)
+
+        # Taint-CONFIRMED sink token: collapses the source-name variance of
+        # `flow:<SRC>-><SINK>` into a single class-discriminative signal.
+        # Crucially, ONLY functions where untrusted input actually reaches a
+        # sink produce `tainted:<sink>`; safe sink usage (parameterised query,
+        # escaped output, fixed command) has no flow and therefore no
+        # `tainted:` token. This lets the model separate vulnerable from
+        # benign uses of the same sink and slashes false positives.
+        for flow in self.flows:
+            if "->" in flow:
+                sink = flow.split("->", 1)[1]
+                tainted = f"tainted:{sink}"
+                if tainted not in tokens:
+                    tokens.append(tainted)
 
         return tokens
 
@@ -386,21 +400,42 @@ class TraceVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _source_token_of(self, node: ast.expr) -> str | None:
-        """Return the normalised source token for an expression, or None."""
+        """Return the normalised source token for an expression, or None.
+
+        Matches by substring so that ``request.args.get`` (normalised to
+        ``<REQUEST_INPUT>.get``) still resolves to ``<REQUEST_INPUT>``.
+        """
         name = self._resolve_name(node)
         if name:
             norm = normalise_token(name)
-            if norm in _SOURCE_TOKEN_VALUES:
-                return norm
+            for v in _SOURCE_TOKEN_VALUES:
+                if v in norm:
+                    return v
+        return None
+
+    def _taint_of_expr(self, node: ast.expr) -> str | None:
+        """Resolve the taint source of an expression, propagating through
+        string concatenation (BinOp) and f-strings (JoinedStr). This is what
+        makes the common ``HttpResponse("..." + user_input)`` / ``f"..{x}.."``
+        injection patterns produce a real taint flow instead of being missed.
+        """
+        src = self._source_token_of(node)
+        if src:
+            return src
+        if isinstance(node, ast.Name) and node.id in self._taint:
+            return self._taint[node.id]
+        if isinstance(node, (ast.BinOp, ast.JoinedStr)):
+            for child in ast.iter_child_nodes(node):
+                s = self._taint_of_expr(child)
+                if s:
+                    return s
         return None
 
     def _emit_flow_if_tainted(self, arg_node: ast.expr, sink_canonical: str) -> None:
         trace = self._current_func
         if trace is None:
             return
-        src = self._source_token_of(arg_node)
-        if src is None and isinstance(arg_node, ast.Name) and arg_node.id in self._taint:
-            src = self._taint[arg_node.id]
+        src = self._taint_of_expr(arg_node)
         if src is not None:
             tok = f"flow:{src}->{sink_canonical}"
             if tok not in trace.flows:
@@ -408,9 +443,7 @@ class TraceVisitor(ast.NodeVisitor):
 
     def visit_Assign(self, node: ast.Assign) -> None:
         if self._current_func is not None:
-            src = self._source_token_of(node.value)
-            if src is None and isinstance(node.value, ast.Name) and node.value.id in self._taint:
-                src = self._taint[node.value.id]
+            src = self._taint_of_expr(node.value)
             if src is not None:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
@@ -419,9 +452,7 @@ class TraceVisitor(ast.NodeVisitor):
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if self._current_func is not None and node.value is not None:
-            src = self._source_token_of(node.value)
-            if src is None and isinstance(node.value, ast.Name) and node.value.id in self._taint:
-                src = self._taint[node.value.id]
+            src = self._taint_of_expr(node.value)
             if src is not None and isinstance(node.target, ast.Name):
                 self._taint[node.target.id] = src
         self.generic_visit(node)

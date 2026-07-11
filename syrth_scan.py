@@ -416,6 +416,7 @@ def _extract_per_function_patterns(trace: dict[str, Any]) -> list[dict[str, Any]
             patterns.append({
                 "name": name,
                 "lineno": lineno,
+                "tokens": tokens,
                 "sinks": sinks,
                 "sink_count": sink_count,
                 "has_auth": has_auth,
@@ -599,6 +600,75 @@ def _print_results(
     print(f"{'━' * 64}\n")
 
 
+def _print_functional_results(
+    findings: list[dict[str, Any]],
+    file_class: str,
+    file_conf: float,
+    confirmed: bool,
+    source_label: str,
+    mode: str,
+    threshold: float,
+    explainability: dict[str, Any] | None,
+) -> None:
+    print(f"\n{'━' * 64}")
+    print(f"  SYRTH: Scan Your Risk Trace History")
+    print(f"  Source : {source_label}")
+    print(f"  Mode   : {mode.upper()}")
+    print(f"{'━' * 64}")
+
+    if not findings:
+        print(f"  ✓  No security-relevant functions detected.")
+        print(f"{'━' * 64}\n")
+        return
+
+    cwe_idx = CLASS_NAMES.index(file_class) if file_class in CLASS_NAMES else -1
+    cwe_id = CWE_IDS[cwe_idx] if 0 <= cwe_idx < len(CWE_IDS) else ""
+
+    # File-level verdict
+    if confirmed:
+        tag = "► CONFIRMED" if file_conf >= threshold else "► LIKELY"
+        print(f"\n  {tag}: {file_class} ({file_conf:.0%})  [{cwe_id}]")
+        print(f"    {CWE_DESCRIPTIONS.get(file_class, '')}")
+    else:
+        print(f"\n  ⚠  No confirmed taint flow. Best guess: {file_class} ({file_conf:.0%})")
+        print(f"    Manual review recommended (no untrusted-input→sink path found).")
+
+    # Per-function breakdown, taint-confirmed first
+    print(f"\n  Function Breakdown:")
+    order = sorted(findings, key=lambda f: (not f["has_taint"], -f["confidence"]))
+    for f in order:
+        if f["has_taint"]:
+            icon = "🔴"
+            status = "CONFIRMED"
+        elif f["sinks"]:
+            icon = "🟡"
+            status = "review"
+        else:
+            icon = "🟢"
+            status = "ok"
+        sinks_str = ", ".join(f["sinks"][:3]) if f["sinks"] else "none"
+        auth_str = "✓ auth" if f["has_auth"] else "✗ no auth"
+        print(
+            f"    {icon} {f['name']} (line {f['lineno']}): "
+            f"{status} → {f['prediction']} {f['confidence']:.0%} | "
+            f"sinks=[{sinks_str}] {auth_str}"
+        )
+        if f["has_taint"]:
+            print(f"       taint path: {'; '.join(f['tainted_sinks'])}")
+
+    # Token importance (top finding)
+    if explainability:
+        token_imp = explainability.get("token_importance", [])
+        if token_imp:
+            print(f"\n  Key Tokens (top confirmed finding):")
+            for t in token_imp[:7]:
+                bar_len = min(int(abs(t["importance"]) * 20), 20)
+                bar = "█" * bar_len
+                print(f"    {t['token']:<35} {bar} ({t['type']})")
+
+    print(f"{'━' * 64}\n")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -652,60 +722,107 @@ def main() -> None:
         _clean_output(source_label, args.mode, args.json)
         sys.exit(0)
 
-    # ── Run inference ────────────────────────────────────────────────────────
+    # ── Load model / engine ────────────────────────────────────────────────
     if args.mode == "dev":
-        bundle  = _load_joblib_bundle(args.model)
-        results = _dev_predict(tokens, bundle)
+        bundle = _load_joblib_bundle(args.model)
+        lib = None
     else:
-        lib     = _build_fast_engine(args.engine)
-        results = _fast_predict(tokens, lib)
+        bundle = None
+        lib = _build_fast_engine(args.engine)
 
-    # ── Compute explainability (dev mode only) ──────────────────────────────
+    def _predict(toks):
+        if args.mode == "dev":
+            return _dev_predict(toks, bundle)
+        return _fast_predict(toks, lib)
+
+    # ── Per-function, taint-confirmed analysis ──────────────────────────────
+    # Each function is classified independently. A function is a CONFIRMED
+    # finding only when untrusted input actually reaches a dangerous sink
+    # (it carries a `tainted:<sink>` token). Safe sink usage (parameterised
+    # query, escaped output, fixed command) produces no taint token and is
+    # reported as safe / review-only — this is what stops the scanner from
+    # false-positiving on benign code.
+    patterns = _extract_per_function_patterns(trace)
+    findings = []
+    for p in patterns:
+        ftoks = p.get("tokens", [])
+        if not ftoks:
+            continue
+        preds = _predict(ftoks)
+        cls, conf = preds[0]
+        has_taint = any(t.startswith("tainted:") for t in ftoks)
+        tainted_sinks = sorted({t.split(":", 1)[1] for t in ftoks if t.startswith("tainted:")})
+        findings.append({
+            "name": p["name"], "lineno": p["lineno"],
+            "prediction": cls, "confidence": conf, "all_classes": preds,
+            "has_taint": has_taint, "tainted_sinks": tainted_sinks,
+            "sinks": p["sinks"], "has_auth": p["has_auth"],
+            "risk_level": p["risk_level"], "risk_factors": p["risk_factors"],
+            "tokens": ftoks,
+        })
+
+    tainted = [f for f in findings if f["has_taint"]]
+    if tainted:
+        top = max(tainted, key=lambda f: f["confidence"])
+        file_class, file_conf = top["prediction"], top["confidence"]
+        file_preds = top["all_classes"]
+    else:
+        # No confirmed taint path in the file: fall back to a discounted
+        # whole-file prediction (low confidence → manual review).
+        file_preds = _predict(tokens)
+        file_class, file_conf = file_preds[0]
+        file_conf *= 0.5
+
+    # ── Explainability (dev mode, top confirmed finding) ────────────────────
     explainability = None
     if args.mode == "dev":
-        top_class, top_conf = results[0]
-
-        # Per-function patterns
-        per_function = _extract_per_function_patterns(trace)
-
-        # Token importance
-        token_importance = _compute_token_importance(tokens, bundle, top_class)
-
-        # Pattern summary
-        pattern_summary = _generate_pattern_summary(
-            top_class, top_conf, per_function, token_importance
+        top_find = max(findings, key=lambda f: f["confidence"]) if findings else None
+        token_importance = (
+            _compute_token_importance(top_find["tokens"], bundle, top_find["prediction"])
+            if top_find else []
         )
-
+        pattern_summary = _generate_pattern_summary(
+            file_class, file_conf, patterns, token_importance
+        )
         explainability = {
-            "per_function": per_function,
+            "per_function": findings,
             "token_importance": token_importance,
             "pattern_summary": pattern_summary,
         }
 
     # ── Output ───────────────────────────────────────────────────────────────
     if args.json:
-        top_class, top_conf = results[0]
-        cwe_idx = CLASS_NAMES.index(top_class) if top_class in CLASS_NAMES else -1
+        cwe_idx = CLASS_NAMES.index(file_class) if file_class in CLASS_NAMES else -1
         output = {
             "syrth_version": "1.0.0",
             "source": source_label,
             "mode": args.mode,
             "prediction": {
-                "class":       top_class,
-                "cwe_id":      CWE_IDS[cwe_idx] if cwe_idx >= 0 else "",
-                "confidence":  round(top_conf, 4),
-                "description": CWE_DESCRIPTIONS.get(top_class, ""),
+                "class": file_class,
+                "cwe_id": CWE_IDS[cwe_idx] if cwe_idx >= 0 else "",
+                "confidence": round(file_conf, 4),
+                "confirmed_flow": bool(tainted),
+                "description": CWE_DESCRIPTIONS.get(file_class, ""),
             },
-            "all_classes": [
-                {"class": n, "confidence": round(c, 4)}
-                for n, c in results
+            "all_classes": [{"class": n, "confidence": round(c, 4)} for n, c in file_preds],
+            "findings": [
+                {
+                    "function": f["name"], "line": f["lineno"],
+                    "prediction": f["prediction"], "confidence": round(f["confidence"], 4),
+                    "confirmed_flow": f["has_taint"], "tainted_sinks": f["tainted_sinks"],
+                    "sinks": f["sinks"],
+                }
+                for f in findings
             ],
         }
         if explainability:
             output["explainability"] = explainability
         print(json.dumps(output, indent=2))
     else:
-        _print_results(results, source_label, args.mode, args.threshold, explainability)
+        _print_functional_results(
+            findings, file_class, file_conf, bool(tainted),
+            source_label, args.mode, args.threshold, explainability,
+        )
 
 
 if __name__ == "__main__":
