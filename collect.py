@@ -177,6 +177,68 @@ _SOURCE_TOKEN_VALUES: frozenset[str] = frozenset({
     "<FILE_PATH>", "<URL_PARAM>", "<CMD>", "<SQL>",
 })
 
+# Additional source patterns for taint tracking — these common Python
+# input sources are NOT in the normalisation patterns but ARE user-controlled.
+_EXTRA_SOURCE_CALLS: frozenset[str] = frozenset({
+    "os.environ", "os.getenv", "os.environ.get",
+    "sys.argv", "input", "cgi.FieldStorage",
+    "environ", "getenv",
+})
+
+# Sink categories — map canonical sink names to a category token.
+# Emitted as SCAT:<CAT> in to_token_sequence() so the model can distinguish
+# vulnerability classes even without taint traces.
+_SINK_CATEGORIES: dict[str, str] = {
+    # SQL injection
+    "execute": "SCAT:SQL", "executemany": "SCAT:SQL",
+    "raw": "SCAT:SQL", "RawSQL": "SCAT:SQL",
+    "extra": "SCAT:SQL", "cursor.execute": "SCAT:SQL",
+    "connection.execute": "SCAT:SQL", "Model.objects.raw": "SCAT:SQL",
+    # XSS / template injection
+    "render": "SCAT:XSS", "render_to_string": "SCAT:XSS",
+    "render_to_response": "SCAT:XSS", "mark_safe": "SCAT:XSS",
+    "SafeString": "SCAT:XSS", "render_template": "SCAT:XSS",
+    "render_template_string": "SCAT:XSS", "make_response": "SCAT:XSS",
+    "Response": "SCAT:XSS", "HttpResponse": "SCAT:XSS",
+    "JsonResponse": "SCAT:XSS", "jsonify": "SCAT:XSS",
+    "HTMLResponse": "SCAT:XSS", "TemplateResponse": "SCAT:XSS",
+    "format_html": "SCAT:XSS", "autoescape_off": "SCAT:XSS",
+    # File system / path traversal
+    "open": "SCAT:FILE", "io.open": "SCAT:FILE",
+    "codecs.open": "SCAT:FILE", "os.path.join": "SCAT:FILE",
+    "os.path.abspath": "SCAT:FILE", "shutil.copy": "SCAT:FILE",
+    "shutil.move": "SCAT:FILE", "shutil.rmtree": "SCAT:FILE",
+    "os.remove": "SCAT:FILE", "os.unlink": "SCAT:FILE",
+    "send_file": "SCAT:FILE", "send_from_directory": "SCAT:FILE",
+    "FileResponse": "SCAT:FILE", "os.makedirs": "SCAT:FILE",
+    # Command injection / RCE
+    "os.system": "SCAT:EXEC", "subprocess.run": "SCAT:EXEC",
+    "subprocess.call": "SCAT:EXEC", "subprocess.Popen": "SCAT:EXEC",
+    "subprocess.getoutput": "SCAT:EXEC", "subprocess.getstatusoutput": "SCAT:EXEC",
+    "popen": "SCAT:EXEC", "os.popen": "SCAT:EXEC",
+    "os.execv": "SCAT:EXEC", "os.execl": "SCAT:EXEC",
+    "eval": "SCAT:EXEC", "exec": "SCAT:EXEC",
+    "compile": "SCAT:EXEC", "execfile": "SCAT:EXEC",
+    # Network / SSRF
+    "requests.get": "SCAT:NET", "requests.post": "SCAT:NET",
+    "requests.put": "SCAT:NET", "requests.delete": "SCAT:NET",
+    "httpx.get": "SCAT:NET", "httpx.post": "SCAT:NET",
+    "urllib.request.urlopen": "SCAT:NET",
+    "aiohttp.request": "SCAT:NET", "urlopen": "SCAT:NET",
+    "socket.create_connection": "SCAT:NET",
+    # Redirect
+    "redirect": "SCAT:REDIRECT", "HttpResponseRedirect": "SCAT:REDIRECT",
+    "HttpResponsePermanentRedirect": "SCAT:REDIRECT",
+    "RedirectResponse": "SCAT:REDIRECT",
+    # Deserialization
+    "pickle.loads": "SCAT:DESER", "pickle.load": "SCAT:DESER",
+    "yaml.load": "SCAT:DESER", "yaml.full_load": "SCAT:DESER",
+    "marshal.loads": "SCAT:DESER", "marshal.load": "SCAT:DESER",
+    "cPickle.loads": "SCAT:DESER", "yaml.unsafe_load": "SCAT:DESER",
+    "jsonpickle.decode": "SCAT:DESER", "numpy.load": "SCAT:DESER",
+    "torch.load": "SCAT:DESER",
+}
+
 _SQL_KEYWORDS: tuple[str, ...] = (
     "SELECT ", "INSERT INTO", "UPDATE ", "DELETE FROM",
     "DROP TABLE", "EXEC ", "EXECUTE ", "UNION SELECT", "OR 1=1",
@@ -235,6 +297,16 @@ class FunctionTrace:
 
         for sink in self.sinks:
             tokens.append(f"sink:{sink}")
+
+        # Sink-category tokens: SCAT:SQL, SCAT:XSS, SCAT:FILE, etc.
+        # These give the model a direct signal for vulnerability class
+        # even without taint traces.
+        seen_cats: set[str] = set()
+        for sink in self.sinks:
+            cat = _SINK_CATEGORIES.get(sink)
+            if cat and cat not in seen_cats:
+                tokens.append(cat)
+                seen_cats.add(cat)
 
         # Raw SQL in function body
         if self.has_sql_string and "execute" not in self.sinks:
@@ -404,6 +476,7 @@ class TraceVisitor(ast.NodeVisitor):
 
         Matches by substring so that ``request.args.get`` (normalised to
         ``<REQUEST_INPUT>.get``) still resolves to ``<REQUEST_INPUT>``.
+        Also matches extra source calls like ``os.environ``, ``sys.argv``.
         """
         name = self._resolve_name(node)
         if name:
@@ -411,13 +484,22 @@ class TraceVisitor(ast.NodeVisitor):
             for v in _SOURCE_TOKEN_VALUES:
                 if v in norm:
                     return v
+            # Check extra source patterns (os.environ, sys.argv, input, etc.)
+            for src in _EXTRA_SOURCE_CALLS:
+                if name == src or name.startswith(src + ".") or norm.startswith(src):
+                    return "<REQUEST_INPUT>"
         return None
 
     def _taint_of_expr(self, node: ast.expr) -> str | None:
         """Resolve the taint source of an expression, propagating through
-        string concatenation (BinOp) and f-strings (JoinedStr). This is what
-        makes the common ``HttpResponse("..." + user_input)`` / ``f"..{x}.."``
-        injection patterns produce a real taint flow instead of being missed.
+        string concatenation (BinOp), f-strings (JoinedStr), dict subscript
+        access, and method calls on tainted objects.  This covers the vast
+        majority of real-world taint patterns:
+          - data["cmd"]          (Subscript on tainted var)
+          - data.get("cmd")     (method call on tainted var)
+          - " ".join(x)         (string method on tainted var)
+          - f"{user_input}"     (f-string)
+          - x + user_input      (BinOp)
         """
         src = self._source_token_of(node)
         if src:
@@ -429,6 +511,23 @@ class TraceVisitor(ast.NodeVisitor):
                 s = self._taint_of_expr(child)
                 if s:
                     return s
+        # dict/list subscript: data["key"], data[0], data["x"]["y"]
+        if isinstance(node, ast.Subscript):
+            return self._taint_of_expr(node.value)
+        # method call on tainted object: data.get("x"), user_input.strip()
+        if isinstance(node, ast.Call):
+            func_src = self._taint_of_expr(node.func)
+            if func_src:
+                return func_src
+            # Check if the Call is an Attribute on a tainted Name
+            if isinstance(node.func, ast.Attribute):
+                base = node.func.value
+                if isinstance(base, ast.Name) and base.id in self._taint:
+                    return self._taint[base.id]
+        # Attribute access on tainted: request.args, data.values
+        if isinstance(node, ast.Attribute):
+            if isinstance(node.value, ast.Name) and node.value.id in self._taint:
+                return self._taint[node.value.id]
         return None
 
     def _emit_flow_if_tainted(self, arg_node: ast.expr, sink_canonical: str) -> None:
@@ -455,6 +554,27 @@ class TraceVisitor(ast.NodeVisitor):
             src = self._taint_of_expr(node.value)
             if src is not None and isinstance(node.target, ast.Name):
                 self._taint[node.target.id] = src
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        if self._current_func is not None:
+            src = self._taint_of_expr(node.iter)
+            if src is not None:
+                if isinstance(node.target, ast.Name):
+                    self._taint[node.target.id] = src
+                elif isinstance(node.target, ast.Tuple):
+                    for elt in node.target.elts:
+                        if isinstance(elt, ast.Name):
+                            self._taint[elt.id] = src
+        self.generic_visit(node)
+
+    def visit_With(self, node: ast.With) -> None:
+        if self._current_func is not None:
+            for item in node.items:
+                if item.optional_vars and isinstance(item.optional_vars, ast.Name):
+                    src = self._taint_of_expr(item.context_expr)
+                    if src is not None:
+                        self._taint[item.optional_vars.id] = src
         self.generic_visit(node)
 
     def visit_Return(self, node: ast.Return) -> None:
