@@ -29,7 +29,7 @@ from typing import Any
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_JOBLIB   = "syrth_model.joblib"
+DEFAULT_JOBLIB   = "syrth_ensemble.joblib"
 DEFAULT_C_HEADER = "syrth_engine.h"
 CONFIDENCE_DISCLAIMER = 0.60
 
@@ -80,6 +80,44 @@ def _dev_predict(tokens: list[str], bundle: dict[str, Any]) -> list[tuple[str, f
     sys.path.insert(0, str(Path(__file__).parent))
     from train_model import SyrthEncoder, SyrthTokenizer, MAX_SEQ_LEN
 
+    # Ensemble bundle (5 models)
+    if "ensemble" in bundle:
+        tok = SyrthTokenizer()
+        tok.vocab = bundle["tokenizer_vocab"]
+
+        models = []
+        for name, mdata in bundle["ensemble"].items():
+            cfg = mdata["model_config"]
+            model = SyrthEncoder(
+                vocab_size=cfg["vocab_size"],
+                embed_dim=cfg["embed_dim"],
+                ffn_dim=cfg["ffn_dim"],
+                num_classes=cfg["num_classes"],
+                dropout=0.0,
+                aux_dim=0,
+            )
+            import numpy as np
+            state = {k: torch.from_numpy(v.astype(np.float32)) for k, v in mdata["state_dict"].items()}
+            model.load_state_dict(state)
+            model.eval()
+            models.append((model, max(mdata["heldout_acc"], 0.5)))
+
+        ids = tok.encode(tokens)
+        x = torch.tensor([ids], dtype=torch.long)
+        with torch.no_grad():
+            votes = torch.zeros(5)
+            for model, weight in models:
+                probs = F.softmax(model(x), dim=-1)[0]
+                votes += probs * weight
+            probs = (votes / votes.sum()).numpy()
+
+        return sorted(
+            zip(CLASS_NAMES, probs.tolist()),
+            key=lambda t: t[1],
+            reverse=True,
+        )
+
+    # Single model bundle (legacy)
     cfg   = bundle["model_config"]
     vocab = bundle["tokenizer_vocab"]
 
@@ -262,8 +300,25 @@ def _compute_token_importance(
     sys.path.insert(0, str(Path(__file__).parent))
     from train_model import SyrthEncoder, SyrthTokenizer
 
-    cfg   = bundle["model_config"]
-    vocab = bundle["tokenizer_vocab"]
+    # For ensemble bundles, use first model for explainability
+    ensemble_aux_dim = 0
+    if "ensemble" in bundle:
+        first_name = next(iter(bundle["ensemble"]))
+        mdata = bundle["ensemble"][first_name]
+        cfg = mdata["model_config"]
+        vocab = bundle["tokenizer_vocab"]
+        state_dict = {
+            k: torch.from_numpy(v.astype(np.float32))
+            for k, v in mdata["state_dict"].items()
+        }
+        ensemble_aux_dim = cfg.get("aux_dim", 0)
+    else:
+        cfg = bundle["model_config"]
+        vocab = bundle["tokenizer_vocab"]
+        state_dict = {
+            k: torch.from_numpy(v.astype(np.float32))
+            for k, v in bundle["model_state_dict"].items()
+        }
 
     tok = SyrthTokenizer()
     tok.vocab    = vocab
@@ -275,11 +330,8 @@ def _compute_token_importance(
         ffn_dim=cfg.get("ffn_dim", 128),
         num_classes=cfg["num_classes"],
         dropout=0.0,
+        aux_dim=ensemble_aux_dim,
     )
-    state_dict = {
-        k: torch.from_numpy(v.astype(np.float32))
-        for k, v in bundle["model_state_dict"].items()
-    }
     model.load_state_dict(state_dict)
     model.eval()
 
