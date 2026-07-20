@@ -31,6 +31,8 @@ class FocalLoss(nn.Module):
 # ── Load data ──────────────────────────────────────────────────────────────
 train = json.load(open("_balanced_dataset.json"))["records"]
 test = json.load(open("testingMassiveDataset.json"))["records"]
+LOGGER.info("Train classes: %s", {i: sum(1 for r in train if r["label"] == i) for i in range(5)})
+LOGGER.info("Test classes: %s", {i: sum(1 for r in test if r["label"] == i) for i in range(5)})
 LOGGER.info("Train: %d, Test: %d", len(train), len(test))
 
 tokenizer = SyrthTokenizer()
@@ -161,9 +163,10 @@ for cfg in configs:
 
 # ── Save ensemble bundle ──────────────────────────────────────────────────
 ensemble_bundle = {
-    "syrth_version": "1.2.0",
+    "syrth_version": "2.0.0",
     "tokenizer_vocab": tokenizer.vocab,
     "vocab_size": tokenizer.vocab_size(),
+    "dataset": "v2 (1283 train, 321 test)",
     "ensemble": {},
 }
 
@@ -185,47 +188,5 @@ for name, mdata in ensemble_models.items():
     }
 
 import joblib
-joblib.dump(ensemble_bundle, "syrth_ensemble_v2.joblib", compress=3)
-LOGGER.info("Ensemble v2 saved → syrth_ensemble_v2.joblib (focal + balanced)")
-
-# ── Threshold calibration on training data ────────────────────────────────
-# Find per-class optimal confidence thresholds using one-fold CV
-LOGGER.info("Calibrating per-class thresholds...")
-all_probs = []
-all_labels = []
-
-# Use all training data for calibration
-model_list = [(m["model"], max(m["heldout_acc"], 0.5)) for m in ensemble_models.values()]
-for model, w in model_list:
-    model.eval()
-    with torch.no_grad():
-        probs = model.predict_proba(X_t.to(device))
-        all_probs.append(probs.cpu().numpy() * w)
-
-# Weighted vote
-avg_probs = np.mean(all_probs, axis=0)
-
-# For each class, find threshold that maximizes F1 vs rest
-from sklearn.metrics import f1_score
-
-best_thresholds = {}
-for c in range(NUM_CLASSES):
-    best_t = 0.0
-    best_f1_c = 0.0
-    for t in np.arange(0.1, 1.0, 0.05):
-        preds = np.argmax(avg_probs, axis=1)
-        # Override: if class c has confidence > t, use it; else keep argmax
-        override = avg_probs[:, c] > t
-        preds_c = preds.copy()
-        preds_c[override] = c
-        f1 = f1_score(y, preds_c, average="weighted", zero_division=0)
-        f1_c = f1_score(y == c, preds_c == c, zero_division=0)
-        if f1_c > best_f1_c:
-            best_f1_c = f1_c
-            best_t = t
-    best_thresholds[c] = {"threshold": best_t, "f1": best_f1_c}
-    LOGGER.info("  Class %d: threshold=%.2f, F1=%.3f", c, best_t, best_f1_c)
-
-ensemble_bundle["thresholds"] = best_thresholds
-joblib.dump(ensemble_bundle, "syrth_ensemble_v2.joblib", compress=3)
-LOGGER.info("Thresholds saved → syrth_ensemble_v2.joblib")
+joblib.dump(ensemble_bundle, "syrth_ensemble.joblib", compress=3)
+LOGGER.info("Ensemble saved → syrth_ensemble.joblib (v2 dataset, 1283 train)")

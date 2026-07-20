@@ -1408,12 +1408,15 @@ _TARGET_PKGS = re.compile(
 
 _CWE_KEYWORD_MAP: list[tuple[list[str], str]] = [
     (["sql injection", "sqli", "raw query", "cursor.execute"], "CWE-89"),
-    (["xss", "cross-site scripting", "html injection", "mark_safe", "autoescape"], "CWE-79"),
-    (["path traversal", "directory traversal", "zip slip", "../", "filename injection"], "CWE-22"),
-    (["open redirect", "unvalidated redirect", "relaystate"], "CWE-601"),
-    (["remote code execution", "rce", "code injection", "eval(", "exec(",
-      "pickle", "yaml.load", "deserialization", "shell=true", "ssti",
-      "template injection"], "CWE-94"),
+    (["xss", "cross-site scripting", "html injection", "mark_safe",
+      "autoescape", "render_template", "HttpResponse"], "CWE-79"),
+    (["path traversal", "directory traversal", "zip slip", "../",
+      "filename injection", "send_file"], "CWE-22"),
+    (["open redirect", "unvalidated redirect", "relaystate",
+      "HttpResponseRedirect", "RedirectResponse"], "CWE-601"),
+    (["remote code execution", "rce", "code injection", "eval(",
+      "exec(", "pickle", "yaml.load", "deserialization", "shell=true",
+      "ssti", "template injection"], "CWE-94"),
 ]
 
 
@@ -1484,7 +1487,7 @@ def _build_advisory_tokens(description: str, severity: str, cwe_id: str) -> list
         # Discard code: text tokens — they don't match syrth_scan.py inference vocabulary
         ast_prefixes = ("def:", "arg:", "sink:", "call:", "ret:", "@", "meta:", "flow:")
         ast_tokens = [t for t in code_tokens if t.startswith(ast_prefixes)]
-        if len(ast_tokens) >= 3:
+        if len(ast_tokens) >= 2:
             if isinstance(severity, dict):
                 severity = severity.get("type", "")
             elif isinstance(severity, list):

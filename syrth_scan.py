@@ -726,6 +726,13 @@ def _print_functional_results(
     cwe_idx = CLASS_NAMES.index(file_class) if file_class in CLASS_NAMES else -1
     cwe_id = CWE_IDS[cwe_idx] if 0 <= cwe_idx < len(CWE_IDS) else ""
 
+    # OOD rejection
+    if explainability and explainability.get("ood"):
+        print(f"\n  ⚠  UNCERTAIN PREDICTION (confidence {file_conf:.0%} < threshold)")
+        print(f"     This block has no strong vulnerability signal.")
+        print(f"     Manual review required.")
+        return
+
     # File-level verdict
     if confirmed:
         tag = "► CONFIRMED" if file_conf >= threshold else "► LIKELY"
@@ -788,7 +795,10 @@ def main() -> None:
     parser.add_argument("--mode",      choices=["fast", "dev"], default="dev")
     parser.add_argument("--model",     default=DEFAULT_JOBLIB)
     parser.add_argument("--engine",    default=DEFAULT_C_HEADER)
-    parser.add_argument("--threshold", type=float, default=0.40)
+    parser.add_argument("--threshold", type=float, default=0.40,
+                        help="Confidence threshold. Top prediction below this → Unknown (OOD)")
+    parser.add_argument("--ood-threshold", type=float, default=None,
+                        help="OOD rejection threshold (default: same as --threshold)")
     parser.add_argument("--json",      action="store_true")
     args = parser.parse_args()
 
@@ -875,6 +885,15 @@ def main() -> None:
         file_class, file_conf = file_preds[0]
         file_conf *= 0.5
 
+    # ── OOD rejection ───────────────────────────────────────────────────────
+    # If top prediction confidence is below threshold, report as Unknown.
+    # This improves precision by rejecting uncertain predictions.
+    # Taint-confirmed findings ALWAYS override OOD (taint is highest precision).
+    ood_threshold = args.ood_threshold if args.ood_threshold is not None else args.threshold
+    is_ood = file_conf < ood_threshold and not tainted
+    if is_ood:
+        file_class = "Unknown"
+
     # ── Explainability (dev mode, top confirmed finding) ────────────────────
     explainability = None
     if args.mode == "dev":
@@ -890,6 +909,8 @@ def main() -> None:
             "per_function": findings,
             "token_importance": token_importance,
             "pattern_summary": pattern_summary,
+            "ood": is_ood,
+            "ood_threshold": ood_threshold,
         }
 
     # ── Output ───────────────────────────────────────────────────────────────
@@ -899,6 +920,7 @@ def main() -> None:
             "syrth_version": "1.0.0",
             "source": source_label,
             "mode": args.mode,
+            "ood": is_ood,
             "prediction": {
                 "class": file_class,
                 "cwe_id": CWE_IDS[cwe_idx] if cwe_idx >= 0 else "",
