@@ -64,7 +64,7 @@ except ImportError:
 ROOT = Path(__file__).parent.absolute()
 BENCH_DIR = ROOT / "benchmark"
 TEST_DIR = ROOT / "tests"
-DATASET_PATH = ROOT / "_dataset.json"
+DATASET_PATH = ROOT / "testingMassiveDataset.json"
 MODEL_PATH = ROOT / "syrth_model.joblib"
 C_HEADER_PATH = ROOT / "syrth_engine.h"
 C_TEST_PATH = ROOT / "tests" / "test_c_engine.c"
@@ -259,45 +259,30 @@ def _generate_synthetic_samples(n: int = 80) -> List[Tuple[List[str], int, str]]
     """Generate synthetic vulnerability samples for testing."""
     templates = [
         # SQLi (label 0)
-        (["def:get_user", "arg:user_input", "sink:execute", "query:SELECT", "data:user_data"], 0, "SQLi"),
-        (["arg:sql_query", "sink:cursor.execute", "data:unsanitized", "flow:direct"], 0, "SQLi"),
-        (["arg:id", "sink:raw_query", "data:tainted", "query:INSERT"], 0, "SQLi"),
-        (["def:search", "arg:term", "sink:like_query", "pattern:%{input}%"], 0, "SQLi"),
+        (["def:get_user", "arg:user_input", "sink:execute", "query:SELECT", "tainted:execute"], 0, "SQLi"),
+        (["arg:sql_query", "sink:cursor.execute", "data:unsanitized", "flow:direct", "tainted:execute"], 0, "SQLi"),
+        (["arg:id", "sink:raw_query", "data:tainted", "query:INSERT", "tainted:raw_query"], 0, "SQLi"),
+        (["def:search", "arg:term", "sink:like_query", "pattern:%{input}%", "tainted:like_query"], 0, "SQLi"),
         # XSS (label 1)
-        (["arg:user_input", "sink:render_template", "context:html", "data:unescaped"], 1, "XSS"),
-        (["def:show_comment", "arg:comment", "sink:innerHTML", "context:javascript"], 1, "XSS"),
-        (["arg:name", "sink:document.write", "data:reflected"], 1, "XSS"),
-        (["def:render", "arg:content", "sink:eval", "source:query_param"], 1, "XSS"),
-        # IDOR (label 2)
-        (["arg:doc_id", "sink:db.find", "check:auth_missing", "data:document"], 2, "IDOR"),
-        (["def:download", "arg:file_id", "sink:send_file", "check:no_verify"], 2, "IDOR"),
-        (["arg:account_id", "sink:query", "check:owner_bypass", "data:financial"], 2, "IDOR"),
-        (["def:view_record", "arg:record_id", "sink:access", "auth:none"], 2, "IDOR"),
-        # SSRF (label 3)
-        (["arg:url", "sink:requests.get", "data:internal_response", "flow:url_forgery"], 3, "SSRF"),
-        (["def:fetch_webhook", "arg:target", "sink:urlopen", "check:no_validate"], 3, "SSRF"),
-        (["arg:endpoint", "sink:http_client", "data:internal_metadata"], 3, "SSRF"),
-        (["def:proxy", "arg:destination", "sink:curl", "filter:none"], 3, "SSRF"),
-        # Path Traversal (label 4)
-        (["arg:filename", "sink:open", "path:../../../etc/passwd", "data:file_content"], 4, "PathTraversal"),
-        (["def:read_file", "arg:path", "sink:read", "check:no_normalize"], 4, "PathTraversal"),
-        (["arg:filepath", "sink:send_from_directory", "traversal:..%2f.."], 4, "PathTraversal"),
-        (["def:upload", "arg:name", "sink:save", "sanitize:none"], 4, "PathTraversal"),
-        # Open Redirect (label 5)
-        (["arg:next", "sink:redirect", "url:https://evil.com", "check:no_whitelist"], 5, "OpenRedirect"),
-        (["def:login_redirect", "arg:return_to", "sink:HttpResponseRedirect"], 5, "OpenRedirect"),
-        (["arg:goto", "sink:location_header", "scheme:javascript"], 5, "OpenRedirect"),
-        (["def:oauth", "arg:callback", "sink:external_redirect"], 5, "OpenRedirect"),
-        # Broken Auth (label 6)
-        (["def:login", "arg:password", "check:hardcoded", "sink:compare", "data:admin123"], 6, "BrokenAuth"),
-        (["arg:token", "sink:verify_jwt", "check:no_expiry", "data:old_token"], 6, "BrokenAuth"),
-        (["arg:otp", "sink:check_code", "brute_force:allowed"], 6, "BrokenAuth"),
-        (["def:reset", "arg:token", "sink:compare", "entropy:low"], 6, "BrokenAuth"),
-        # RCE (label 7)
-        (["arg:command", "sink:os.system", "data:user_input", "flow:command_injection"], 7, "RCE"),
-        (["def:run_shell", "arg:cmd", "sink:subprocess.call", "check:no_sanitize"], 7, "RCE"),
-        (["arg:code", "sink:eval", "source:user"], 7, "RCE"),
-        (["def:ping", "arg:host", "sink:exec", "injection:|"], 7, "RCE"),
+        (["arg:user_input", "sink:render_template", "context:html", "data:unescaped", "tainted:render_template"], 1, "XSS"),
+        (["def:show_comment", "arg:comment", "sink:innerHTML", "context:javascript", "tainted:innerHTML"], 1, "XSS"),
+        (["arg:name", "sink:document.write", "data:reflected", "tainted:document.write"], 1, "XSS"),
+        (["def:render", "arg:content", "sink:HttpResponse", "source:query_param", "tainted:HttpResponse"], 1, "XSS"),
+        # Path Traversal (label 2)
+        (["arg:filename", "sink:open", "path:../../../etc/passwd", "data:file_content", "tainted:open"], 2, "PathTraversal"),
+        (["def:read_file", "arg:path", "sink:read", "<FILE_PATH>", "tainted:read"], 2, "PathTraversal"),
+        (["arg:filepath", "sink:send_from_directory", "traversal:..%2f..", "tainted:send_from_directory"], 2, "PathTraversal"),
+        (["def:upload", "arg:name", "sink:os.path.join", "<FILE_PATH>", "tainted:os.path.join"], 2, "PathTraversal"),
+        # Open Redirect (label 3)
+        (["arg:next", "sink:redirect", "url:https://evil.com", "<URL_PARAM>", "tainted:redirect"], 3, "OpenRedirect"),
+        (["def:login_redirect", "arg:return_to", "sink:HttpResponseRedirect", "<URL_PARAM>", "tainted:HttpResponseRedirect"], 3, "OpenRedirect"),
+        (["arg:goto", "sink:location_header", "scheme:javascript", "<URL_PARAM>", "tainted:location_header"], 3, "OpenRedirect"),
+        (["def:oauth", "arg:callback", "sink:external_redirect", "<URL_PARAM>", "tainted:external_redirect"], 3, "OpenRedirect"),
+        # RCE (label 4)
+        (["arg:command", "sink:os.system", "data:user_input", "flow:command_injection", "tainted:os.system"], 4, "RCE"),
+        (["def:run_shell", "arg:cmd", "sink:subprocess.call", "check:no_sanitize", "tainted:subprocess.call"], 4, "RCE"),
+        (["arg:code", "sink:eval", "source:user", "tainted:eval"], 4, "RCE"),
+        (["def:ping", "arg:host", "sink:exec", "injection:|", "tainted:exec"], 4, "RCE"),
     ]
 
     samples = []
@@ -337,7 +322,7 @@ def benchmark_python(samples: List[Tuple[List[str], int, str]]) -> Dict:
             vocab_size=config["vocab_size"],
             embed_dim=config.get("embed_dim", 64),
             ffn_dim=config.get("ffn_dim", 128),
-            num_classes=config.get("num_classes", 8),
+            num_classes=config.get("num_classes", 5),
         )
 
         # Load weights
@@ -653,7 +638,7 @@ def benchmark_agreement(samples: List, max_samples: int = BENCHMARK_RUNS) -> Dic
             vocab_size=cfg["vocab_size"],
             embed_dim=cfg.get("embed_dim", 64),
             ffn_dim=cfg.get("ffn_dim", 128),
-            num_classes=cfg.get("num_classes", 8),
+            num_classes=cfg.get("num_classes", 5),
         )
         model.load_state_dict(
             {k: torch.tensor(v) for k, v in bundle["model_state_dict"].items()}

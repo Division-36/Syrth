@@ -591,181 +591,19 @@ def _load_dataset(path: str) -> list[dict[str, Any]]:
     return [r for r in records if r.get("tokens") and isinstance(r.get("label"), int)]
 
 
-def train_and_evaluate(
-    dataset_path: str = "_dataset.json",
-    export_joblib_flag: bool = True,
-    export_c_flag: bool = True,
-    joblib_path: str = "syrth_model.joblib",
-    c_path: str = "syrth_engine.h",
-) -> None:
-    """Main training pipeline with k-fold cross-validation for crazy accuracy."""
-
-    if not Path(dataset_path).exists():
-        LOGGER.error("Dataset not found: %s", dataset_path)
-        return
-
-    # ── Load Data ────────────────────────────────────────────────────────────
-    LOGGER.info("Loading dataset from %s...", dataset_path)
-    records = _load_dataset(dataset_path)
-
-    if not records:
-        LOGGER.error("No usable records in dataset.")
-        return
-
-    LOGGER.info("Dataset: %d records", len(records))
-
-    # Class distribution
-    class_counts = Counter(r["label"] for r in records)
-    for label, count in sorted(class_counts.items()):
-        LOGGER.info("  Class %d (%s): %d", label, CWE_NAMES[label] if label < len(CWE_NAMES) else "?", count)
-
-    # ── Tokenizer ────────────────────────────────────────────────────────────
-    LOGGER.info("Building tokenizer...")
-    tokenizer = SyrthTokenizer()
-    tokenizer.fit([r["tokens"] for r in records])
-    LOGGER.info("Vocabulary size: %d tokens", tokenizer.vocab_size())
-
-    # ── Prepare arrays ─────────────────────────────────────────────────────────
-    all_tokens = [tokenizer.encode(r["tokens"]) for r in records]
-    X_all = np.array(all_tokens)
-    y_all = np.array([r["label"] for r in records])
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    LOGGER.info("Device: %s", device)
-
-    # ── K-Fold Cross Validation ───────────────────────────────────────────────
-    LOGGER.info("=" * 58)
-    LOGGER.info("K-FOLD CROSS VALIDATION (k=%d)", K_FOLDS)
-    LOGGER.info("=" * 58)
-
-    kfold = StratifiedKFold(n_splits=K_FOLDS, shuffle=True, random_state=42)
-    fold_results = []
-    all_models = []  # Store all models for ensemble
-    best_model = None
-    best_acc = 0.0
-
-    for fold, (train_idx, val_idx) in enumerate(kfold.split(X_all, y_all)):
-        LOGGER.info("\n--- Fold %d/%d ---", fold + 1, K_FOLDS)
-
-        X_train, X_val = X_all[train_idx], X_all[val_idx]
-        y_train, y_val = y_all[train_idx], y_all[val_idx]
-
-        # Build model for this fold
-        model = SyrthEncoder(vocab_size=tokenizer.vocab_size())
-        LOGGER.info("  Train: %d, Val: %d", len(X_train), len(X_val))
-
-        # Train
-        train_ds = torch.utils.data.TensorDataset(torch.tensor(X_train), torch.tensor(y_train))
-        train_loader = DataLoader(train_ds, batch_size=DEFAULT_BATCH_SIZE, shuffle=True)
-
-        model = train_final(
-            model, train_loader,
-            torch.tensor(X_val), torch.tensor(y_val),
-            epochs=DEFAULT_EPOCHS, lr=DEFAULT_LR, device=device,
-        )
-
-        # Evaluate
-        eval_results = _eval_model(model, torch.tensor(X_val), torch.tensor(y_val), device)
-        fold_results.append(eval_results)
-        all_models.append(model)  # Save for ensemble
-
-        LOGGER.info("  Fold %d Accuracy: %.2f%%", fold + 1, eval_results["accuracy"] * 100)
-
-        # Keep best single model
-        if eval_results["accuracy"] > best_acc:
-            best_acc = eval_results["accuracy"]
-            best_model = model
-
-    # ── Ensemble Evaluation ──────────────────────────────────────────────────
-    LOGGER.info("\n" + "=" * 58)
-    LOGGER.info("ENSEMBLE VOTING (All %d Models)", K_FOLDS)
-    LOGGER.info("=" * 58)
-
-    # Ensemble prediction on full dataset
-    X_all_t = torch.tensor(X_all)
-    ensemble_probs = torch.zeros(len(X_all), NUM_CLASSES)
-
-    for model in all_models:
-        model.eval()
-        with torch.no_grad():
-            probs = model.predict_proba(X_all_t.to(device))
-            ensemble_probs += probs.cpu()
-
-    ensemble_probs /= len(all_models)
-    ensemble_preds = ensemble_probs.argmax(dim=-1).numpy()
-    y_np = y_all
-
-    ensemble_acc = metrics.accuracy_score(y_np, ensemble_preds)
-    ensemble_f1 = metrics.f1_score(y_np, ensemble_preds, average="weighted", zero_division=0)
-
-    LOGGER.info("  Ensemble Accuracy: %.2f%%", ensemble_acc * 100)
-    LOGGER.info("  Ensemble F1: %.4f", ensemble_f1)
-
-    # ── Cross-Validated Results ───────────────────────────────────────────────
-    LOGGER.info("\n" + "=" * 58)
-    LOGGER.info("CROSS-VALIDATED RESULTS")
-    LOGGER.info("=" * 58)
-
-    mean_acc = np.mean([r["accuracy"] for r in fold_results])
-    std_acc = np.std([r["accuracy"] for r in fold_results])
-    mean_f1 = np.mean([r["f1"] for r in fold_results])
-
-    LOGGER.info("  Mean Accuracy: %.2f%% (+/- %.2f%%)", mean_acc * 100, std_acc * 100)
-    LOGGER.info("  Mean F1: %.4f", mean_f1)
-
-    for i in range(NUM_CLASSES):
-        class_accs = []
-        for r in fold_results:
-            cm = np.array(r["confusion_matrix"])
-            if cm[i].sum() > 0:
-                class_accs.append(cm[i, i] / cm[i].sum())
-        if class_accs:
-            LOGGER.info("  %s: %.1f%%", CWE_NAMES[i], np.mean(class_accs) * 100)
-
-    LOGGER.info("=" * 58)
-
-    # ── Export ───────────────────────────────────────────────────────────────
-    # Use ensemble model (best single model as fallback for C header simplicity)
-    metrics_dict = {
-        "cv_accuracy_mean": mean_acc,
-        "cv_accuracy_std": std_acc,
-        "cv_f1_mean": mean_f1,
-        "ensemble_accuracy": ensemble_acc,
-        "ensemble_f1": ensemble_f1,
-        "fold_results": [{k: v for k, v in r.items() if k != "confusion_matrix"} for r in fold_results],
-        "train_samples": len(X_all),
-    }
-
-    # Export best single model for C header simplicity
-    if export_joblib_flag:
-        # Save ensemble info but use best model for export
-        export_joblib(best_model, tokenizer, metrics_dict, output_path=joblib_path)
-
-    if export_c_flag:
-        export_c_header(best_model, tokenizer, output_path=c_path)
-
-    LOGGER.info("Training complete!")
-    LOGGER.info("  Single Best CV: %.2f%%", mean_acc * 100)
-    LOGGER.info("  Ensemble Full:  %.2f%%", ensemble_acc * 100)
-
-
-# ── Entry Point ─────────────────────────────────────────────────────────────
+# ── DEPRECATED: Ensemble / K-fold entry point ───────────────────────────────
+# Removed: the ensemble pipeline used a 20-fold CV with K_FOLDS=20 and
+# description-inclusive features, producing inflated accuracy.  The canonical
+# entry point is now ``train_final_only.py`` which trains a single model on
+# the leak-free, code-only dataset produced by ``repair_dataset.py --code-only``.
+#
+# This function and its CLI are retained only for backward compatibility with
+# any external scripts.  DO NOT USE — call ``train_final_only.py`` instead.
+#
+# def train_and_evaluate(...): ...
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="SYRTH: Scan Your Risk Trace History — Model trainer with best-practice pipeline"
-    )
-    parser.add_argument("--dataset", default="_dataset.json", help="Path to dataset JSON")
-    parser.add_argument("--no-export-joblib", action="store_true", help="Skip joblib export")
-    parser.add_argument("--no-export-c", action="store_true", help="Skip C header export")
-    parser.add_argument("--joblib-path", default="syrth_model.joblib")
-    parser.add_argument("--c-path", default="syrth_engine.h")
-    args = parser.parse_args()
-
-    train_and_evaluate(
-        dataset_path=args.dataset,
-        export_joblib_flag=not args.no_export_joblib,
-        export_c_flag=not args.no_export_c,
-        joblib_path=args.joblib_path,
-        c_path=args.c_path,
+    raise SystemExit(
+        "DEPRECATED: use `python train_final_only.py` instead.\n"
+        "See README.md for the current pipeline."
     )

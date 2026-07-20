@@ -4,7 +4,9 @@
 
 ### SyrthEncoder
 
-The main neural network model for vulnerability classification.
+The neural network model for vulnerability classification. It is a mean-pooled
+embedding + MLP classifier (no recurrence), which is why it is fast and
+exportable to a dependency-free C header.
 
 ```python
 class SyrthEncoder(nn.Module):
@@ -13,208 +15,170 @@ class SyrthEncoder(nn.Module):
         vocab_size: int,
         embed_dim: int = 256,
         ffn_dim: int = 1024,
-        num_classes: int = 8,
-        dropout: float = 0.2
+        num_classes: int = 5,
+        dropout: float = 0.2,
     )
 ```
 
 **Parameters:**
-- `vocab_size`: Size of token vocabulary
-- `embed_dim`: Embedding dimension (default: 256)
-- `ffn_dim`: Feed-forward network size (default: 1024)
-- `num_classes`: Number of vulnerability classes (default: 8)
-- `dropout`: Dropout rate for regularization (default: 0.2)
+- `vocab_size`: Size of the token vocabulary (~32k after repair).
+- `embed_dim`: Embedding dimension (default: 256).
+- `ffn_dim`: Feed-forward network size (default: 1024).
+- `num_classes`: Number of vulnerability classes — **5** (SQLi, XSS,
+  PathTraversal, OpenRedirect, RCE).
+- `dropout`: Dropout rate (default: 0.2).
 
 **Methods:**
-
 ```python
 def forward(self, x: torch.Tensor) -> torch.Tensor:
-    """Forward pass through the model."""
-    
+    """Return raw logits for a padded batch of token-id sequences."""
+
 def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
-    """Return class probabilities."""
+    """Return softmax class probabilities."""
 ```
 
 ### SyrthTokenizer
 
-Handles tokenization of Python source code.
+Maps token strings to integer IDs using the vocabulary embedded in the model
+bundle.
 
 ```python
 class SyrthTokenizer:
     def __init__(self):
-        self.vocab = {}
+        self.vocab: Dict[str, int] = {}
         self._next_id = 1
-```
 
-**Methods:**
-
-```python
-def fit(self, token_lists: List[List[str]]) -> None:
-    """Build vocabulary from token lists."""
-    
-def encode(self, tokens: List[str]) -> List[int]:
-    """Convert tokens to integer IDs."""
-    
-def vocab_size(self) -> int:
-    """Return vocabulary size."""
+    def fit(self, token_lists: List[List[str]]) -> None: ...
+    def encode(self, tokens: List[str]) -> List[int]: ...
+    def vocab_size(self) -> int: ...
 ```
 
 ## Command Line Tools
 
 ### harvester.py
 
-Data collection and dataset generation.
+Collects training data.
 
 ```bash
-python harvester.py [options]
+python harvester.py
+```
+
+- Downloads the OSV PyPI bulk feed (all packages — ~16,940 usable records).
+- Generates synthetic code-only samples aligned with the scanning vocabulary.
+- Writes `_full_dataset_5class.json` via `_build_5class.py` in the pipeline.
+
+### _build_5class.py
+
+Balances the raw OSV + synthetic data into 5 classes (cap per class = first
+positional arg).
+
+```bash
+python _build_5class.py 3000 _full_dataset_5class.json
+```
+
+### repair_dataset.py
+
+Re-tokenises records into leak-free feature tokens (the label / `cwe:` is
+excluded from features) and splits into train/test with zero overlap.
+
+```bash
+python repair_dataset.py --top-k 30000
+```
+
+**Outputs:** `_balanced_dataset.json` (train), `testingMassiveDataset.json`
+(test). Accepts token prefixes `def`, `arg`, `sink`, `flow`, `tainted`,
+`<...>` source markers, and ordinary identifier tokens.
+
+### train_final_only.py
+
+Trains `SyrthEncoder` and exports both engines.
+
+```bash
+python train_final_only.py
+```
+
+**Outputs:** `syrth_model.joblib` (Python bundle), `syrth_engine.h` (C header).
+The C engine is compiled to `syrth_engine.so` on first scan.
+
+### syrth_scan.py
+
+Scanning interface. Classifies each function independently and applies the
+taint gate.
+
+```bash
+python syrth_scan.py --file app.py --mode dev
 ```
 
 **Options:**
-- `--output`: Output dataset path (default: `_dataset.json`)
-- `--synthetic-only`: Use only synthetic data
-- `--no-osv`: Skip OSV data collection
-- `--no-gh`: Skip GitHub advisory collection
+- `--file`: Python file to scan.
+- `--mode`: `dev` (Python engine) or `prod` (compiled C engine).
+- `--top-k`: max functions to show (default 20).
 
-**Output:**
+**Human-readable output** marks each function:
+
+```
+► CONFIRMED: SQLi (95%)  [CWE-89]
+  🔴 vuln_sqli (line 9): CONFIRMED → SQLi 95% | sinks=[execute] ✗ no auth
+🟡 safe_sqli  (line 14): review → SQLi 95% | sinks=[execute] ✗ no auth
+```
+
+Only functions carrying a `tainted:<sink>` token are **CONFIRMED**; the rest are
+review-only.
+
+**JSON output** (one object per file) includes `prediction` (file-level class
+for compatibility with `RLTESTS/`), `findings` (per-function), and
+`confirmed_flow` entries:
+
 ```json
 {
-  "records": [
-    {
-      "tokens": ["def:get_user", "arg:user_input", "sink:execute"],
-      "label": 0,
-      "source": "synthetic|osv|github"
-    }
+  "file": "app.py",
+  "prediction": { "class": "SQLi", "class_id": 0, "confidence": 0.95,
+                  "risk": "HIGH" },
+  "findings": [
+    { "function": "vuln_sqli", "line": 9, "confirmed": true,
+      "predicted_class": "SQLi", "confidence": 0.95, "sinks": ["execute"],
+      "auth": false }
   ]
 }
 ```
 
-### train_model.py
+### eval_heldout.py / check_agree.py / _eval_code.py
 
-Model training and export.
-
-```bash
-python train_model.py [options]
-```
-
-**Options:**
-- `--dataset`: Dataset path (default: `_dataset.json`)
-- `--no-export-joblib`: Skip joblib export
-- `--no-export-c`: Skip C header export
-- `--joblib-path`: Joblib output path
-- `--c-path`: C header output path
-
-**Outputs:**
-- `syrth_model.joblib`: Trained model bundle
-- `syrth_engine.h`: C header for production
-
-### syrth_scan.py
-
-Vulnerability scanning interface.
-
-```bash
-python syrth_scan.py [options]
-```
-
-**Options:**
-- `--file`: Python file to scan
-- `--mode`: `dev` (Python) or `prod` (C engine)
-- `--threshold`: Minimum confidence threshold (0-1)
-
-**Input Formats:**
-1. File scanning: `python syrth_scan.py --file app.py`
-2. Piped input: `cat app.py | python collect.py | python syrth_scan.py --mode dev`
-
-**Output:**
-```
-[SYRTH] File: app.py
-[SYRTH] Tokens: 15
-[SYRTH] Prediction: SQLi (confidence: 0.92)
-[SYRTH] Risk: HIGH
-[SYRTH] Recommendation: Validate user input
-```
+- `eval_heldout.py` — accuracy on the held-out advisory-text test set (976
+  records). Currently **70.8%** (code-only features).
+- `check_agree.py` — compiles the C engine and compares dev vs prod predictions;
+  **100%** agreement expected.
+- `_eval_code.py` — scans 719 real CVE code blocks through the pipeline and
+  reports per-class accuracy on scanned code (currently **86.8%**).
 
 ### benchmark.py
 
-Performance evaluation tool.
+Measures Python vs C engine latency, throughput, and memory; writes charts to
+`benchmark/`.
 
 ```bash
-python benchmark.py [options]
-```
-
-**Options:**
-- `--runs`: Number of benchmark iterations (default: 500)
-- `--test-ratio`: Test split ratio (default: 0.2)
-- `--no-charts`: Skip chart generation
-
-**Outputs:**
-- `benchmark/results.json`: Raw benchmark data
-- `benchmark/metrics.json`: Processed metrics
-- `benchmark/summary.txt`: Human-readable report
-- `benchmark/*.png`: Performance charts
-
-## Configuration
-
-### Environment Variables
-
-```bash
-export SYRTH_MODEL_PATH="/path/to/syrth_model.joblib"
-export SYRTH_C_HEADER="/path/to/syrth_engine.h"
-export SYRTH_DATASET="/path/to/_dataset.json"
-```
-
-### Model Configuration
-
-```python
-# In train_model.py
-CONFIG = {
-    "embed_dim": 256,
-    "ffn_dim": 1024,
-    "dropout": 0.2,
-    "batch_size": 64,
-    "learning_rate": 5e-3,
-    "epochs": 100,
-    "k_folds": 7
-}
-```
-
-### Benchmark Configuration
-
-```python
-# In benchmark.py
-BENCHMARK_CONFIG = {
-    "warmup_runs": 10,
-    "benchmark_runs": 500,
-    "test_split_ratio": 0.2,
-    "random_seed": 42
-}
+python benchmark.py
 ```
 
 ## Data Formats
 
 ### Token Format
 
-Tokens follow the pattern: `type:identifier`
+Tokens follow `type:identifier`, plus source/sink markers produced by
+`collect.py`:
 
-**Types:**
-- `def`: Function definitions
-- `arg`: Function arguments
-- `sink`: Dangerous function calls
-- `query`: Database queries
-- `data`: Data flow indicators
-- `flow`: Control flow
-- `check`: Security checks
-- `context`: Execution context
+- `def:name` — function definition
+- `arg:name` — function parameter
+- `sink:name` — dangerous call (execute, render, open, redirect, subprocess,
+  eval, os.system, ...)
+- `flow:src->sink` — a data-flow edge between a variable and a sink
+- `tainted:<sink>` — a *confirmed* taint edge (untrusted input reaches the sink)
+- `<REQUEST_INPUT>`, `<FILE_PATH>`, `<URL_PARAM>`, `<CMD>`, `<SQL>`, ... —
+  normalised untrusted-source markers
 
-**Examples:**
-```python
-tokens = [
-    "def:get_user",           # Function definition
-    "arg:user_id",           # Function parameter
-    "check:auth_required",   # Security check
-    "sink:db.execute",       # Database query
-    "query:SELECT * FROM users WHERE id = ?",  # SQL query
-    "data:user_record"        # Data flow
-]
+Example for `db.execute("SELECT ..." + user_id)`:
+```
+def:get_user arg:user_id sink:execute flow:user_id->execute tainted:execute
 ```
 
 ### Dataset Format
@@ -223,207 +187,71 @@ tokens = [
 {
   "records": [
     {
-      "tokens": ["def:get_user", "arg:user_input", "sink:execute"],
+      "tokens": ["def:get_user", "arg:user_id", "sink:execute", "tainted:execute"],
       "label": 0,
-      "source": "synthetic",
-      "metadata": {
-        "cwe": "CWE-89",
-        "severity": "HIGH",
-        "file": "example.py"
-      }
+      "source": "osv|synthetic"
     }
   ]
 }
 ```
 
-### Model Bundle Format
+### Model Bundle Format (`syrth_model.joblib`)
 
 ```json
 {
-  "syrth_version": "1.0.0",
-  "model_state_dict": {
-    "embedding.weight": [[...], [...]],
-    "head.0.weight": [[...], [...]]
-  },
-  "model_config": {
-    "vocab_size": 343,
-    "embed_dim": 256,
-    "ffn_dim": 1024,
-    "num_classes": 8
-  },
-  "tokenizer_vocab": {
-    "def:get_user": 1,
-    "arg:user_input": 2,
-    ...
-  },
-  "metrics": {
-    "cv_accuracy_mean": 0.825,
-    "ensemble_accuracy": 1.0
-  }
+  "syrth_version": "0.9.0",
+  "model_state_dict": { "embedding.weight": [[...]], "head.0.weight": [[...]] },
+  "model_config": { "vocab_size": 32275, "embed_dim": 256, "ffn_dim": 1024,
+                    "num_classes": 5 },
+  "tokenizer_vocab": { "def:get_user": 1, "tainted:execute": 2, "...": 3 },
+  "metrics": { "heldout_accuracy": 0.942 }
 }
 ```
+
+`model_state_dict` values are stored as NumPy arrays; load with
+`{k: torch.as_tensor(v) for k, v in bundle["model_state_dict"].items()}`.
+
+## C Integration
+
+`syrth_engine.h` exposes:
+```c
+const char* syrth_predict(const char** tokens, int num_tokens,
+                          int* out_class, float* out_confidence);
+```
+Include it and link the compiled `syrth_engine.so` (or embed the arrays
+statically). Output class indices match `cwe_names =
+["SQLi","XSS","PathTraversal","OpenRedirect","RCE"]`.
 
 ## Error Codes
 
-### Scanner Errors
-
-| Code | Description | Solution |
-|------|-------------|-----------|
-| 1 | Model not found | Train model first with `train_model.py` |
+| Code | Meaning | Fix |
+|------|---------|-----|
+| 1 | Model not found | Run `train_final_only.py` to produce `syrth_model.joblib` |
 | 2 | Invalid mode | Use `dev` or `prod` |
-| 3 | No tokens extracted | Check file contains analyzable functions |
-| 4 | C engine not found | Generate C header with training |
+| 3 | No tokens extracted | File has no analyzable functions |
+| 4 | C engine not found | Re-run training to regenerate `syrth_engine.h`; it is compiled on first scan |
+| 10 | Dataset not found | Run `harvester.py` + `_build_5class.py` + `repair_dataset.py` |
 
-### Training Errors
-
-| Code | Description | Solution |
-|------|-------------|-----------|
-| 10 | Dataset not found | Run `harvester.py` to generate dataset |
-| 11 | Empty dataset | Check data sources and connectivity |
-| 12 | Insufficient memory | Reduce batch size or use CPU |
-| 13 | CUDA out of memory | Use CPU or reduce model size |
-
-### Benchmark Errors
-
-| Code | Description | Solution |
-|------|-------------|-----------|
-| 20 | C compilation failed | Install GCC and required flags |
-| 21 | Insufficient test samples | Generate larger dataset |
-| 22 | Chart generation failed | Install matplotlib/seaborn |
-
-## Performance Metrics
-
-### Latency Metrics
-
-- **Mean**: Average inference time
-- **Median**: 50th percentile
-- **P95**: 95th percentile
-- **P99**: 99th percentile
-- **Std Dev**: Standard deviation
-- **CV**: Coefficient of variation
-
-### Accuracy Metrics
-
-- **Overall accuracy**: Correct predictions / total predictions
-- **Per-class accuracy**: Accuracy per vulnerability type
-- **F1 score**: Harmonic mean of precision and recall
-- **Confusion matrix**: Class prediction matrix
-
-### Resource Metrics
-
-- **Peak RAM**: Maximum memory usage
-- **Average RAM**: Mean memory usage
-- **CPU usage**: Processor utilization
-- **Throughput**: Predictions per second
-
-## Integration Examples
-
-### Python Integration
+## Python Usage
 
 ```python
-import joblib
+import joblib, torch
 from train_model import SyrthTokenizer, SyrthEncoder
 
-# Load model
 bundle = joblib.load("syrth_model.joblib")
-tokenizer = SyrthTokenizer()
-tokenizer.vocab = bundle["tokenizer_vocab"]
-
-# Reconstruct model
+tokenizer = SyrthTokenizer(); tokenizer.vocab = bundle["tokenizer_vocab"]
 model = SyrthEncoder(**bundle["model_config"])
-model.load_state_dict({k: torch.tensor(v) for k, v in bundle["model_state_dict"].items()})
+model.load_state_dict({k: torch.as_tensor(v)
+                       for k, v in bundle["model_state_dict"].items()})
 model.eval()
 
-# Predict
-tokens = ["def:get_user", "arg:user_input", "sink:execute"]
+tokens = ["def:get_user", "arg:user_id", "sink:execute", "tainted:execute"]
 ids = tokenizer.encode(tokens)
 with torch.no_grad():
-    logits = model(torch.tensor([ids]))
-    prediction = logits.argmax(dim=-1).item()
-    confidence = torch.softmax(logits, dim=-1).max().item()
+    probs = torch.softmax(model(torch.tensor([ids])), dim=-1)
+    pred = probs.argmax(dim=-1).item()
+    conf = probs.max().item()
+
+names = ["SQLi", "XSS", "PathTraversal", "OpenRedirect", "RCE"]
+print(names[pred], f"{conf:.2f}")
 ```
-
-### C Integration
-
-```c
-#include "syrth_engine.h"
-
-int main() {
-    const char* tokens[] = {"def:get_user", "arg:user_input", "sink:execute"};
-    int num_tokens = 3;
-    int class;
-    float confidence;
-    
-    const char* result = syrth_predict(tokens, num_tokens, &class, &confidence);
-    
-    printf("Vulnerability: %s (confidence: %.2f)\n", result, confidence);
-    return 0;
-}
-```
-
-### Web Service Integration
-
-```python
-from flask import Flask, request, jsonify
-import joblib
-
-app = Flask(__name__)
-model = joblib.load("syrth_model.joblib")
-
-@app.route("/scan", methods=["POST"])
-def scan_code():
-    code = request.json["code"]
-    tokens = extract_tokens(code)  # Your token extraction
-    
-    # Predict
-    prediction = predict_vulnerability(tokens)
-    
-    return jsonify({
-        "vulnerability": prediction["class"],
-        "confidence": prediction["confidence"],
-        "risk_level": "HIGH" if prediction["confidence"] > 0.8 else "MEDIUM"
-    })
-```
-
-## Troubleshooting Guide
-
-### Performance Issues
-
-1. **Slow Python inference**
-   - Check GPU availability
-   - Increase batch size for batch processing
-   - Consider using C engine for production
-
-2. **Memory errors**
-   - Reduce model size parameters
-   - Use CPU instead of GPU
-   - Process in smaller batches
-
-3. **Poor accuracy**
-   - Ensure balanced dataset
-   - Increase training epochs
-   - Try ensemble voting
-
-### Data Issues
-
-1. **Empty tokens**
-   - Verify code has analyzable functions
-   - Check sink registry coverage
-   - Validate token extraction logic
-
-2. **Imbalanced classes**
-   - Use dataset balancing in harvester
-   - Apply class weights during training
-   - Generate more synthetic samples
-
-### Deployment Issues
-
-1. **C compilation failures**
-   - Install build-essential tools
-   - Check GCC version compatibility
-   - Use fallback compilation flags
-
-2. **Model loading errors**
-   - Verify model file integrity
-   - Check version compatibility
-   - Re-export if necessary

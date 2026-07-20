@@ -141,20 +141,21 @@ overlapping records, label excluded from features).
 
 | Metric | Value |
 |---|---|
-| Held-out test accuracy (advisory text) | **94.2%** (976 records, stable split) |
-| SQLi | 89.2% |
-| XSS | 97.1% |
-| PathTraversal | 92.1% |
-| OpenRedirect | 94.2% |
-| RCE | 94.4% |
+| Held-out test accuracy (code-only features) | **70.8%** (277 records, leak-free, no description text) |
+| SQLi | 62.5% |
+| XSS | 56.2% |
+| PathTraversal | 59.6% |
+| OpenRedirect | 96.3% |
+| RCE | 78.8% |
 | Leakage | 0 records |
 | Dev/Fast agreement | 100% |
-| Training data | **16,940 real PyPI advisories** (OSV bulk feed, all packages) + 554 synthetic code templates, balanced to 5,669 records |
+| Training data | **16,940 real PyPI advisories** (OSV bulk feed, all packages) + 554 synthetic code templates; code-only mode keeps 3,584 records with parseable code tokens |
 
 **Real scanned code** (719 real CVE code blocks run through the actual
-`syrth_scan` pipeline): **69.1%** overall — SQLi 97%, XSS 69%, PathTraversal
-70%, OpenRedirect 83%, RCE 64%. Advisory *text* is easier than *code*; this is
-the honest floor for code scanning and is what we optimise for.
+`syrth_scan` pipeline): **86.8%** overall — SQLi 67%, XSS 80%, PathTraversal
+80%, OpenRedirect 100%, RCE 93%. This is the honest code-scanning number:
+features are exactly what `syrth_scan.py` emits at inference (no description
+text, no severity, no framework markers).
 
 **Taint-confirmed, function-level scanning.** `syrth_scan.py` classifies each
 function independently and only raises a **CONFIRMED** finding when untrusted
@@ -171,15 +172,17 @@ dev/fast C-engine agreement **100%**.
 
 > ⚠ **Honesty note:** An earlier 99% figure was invalid — it came from a
 > train/test split that reused identical records *and* leaked the label
-> (`cwe:` token) into the features. Both issues are fixed. The headline
-> hold-out number is on advisory *text*; the **real scanned-code** number
-> (69.1%) is the honest measure of code-scanning quality and is lower because
-> advisory snippets are often incomplete (no full taint path). On complete
-> functions the taint gate makes detection precise.
+> (`cwe:` token) into the features. Both issues are fixed. Training is now
+> **code-only** (no `txt:`, `txt2:`, `severity:`, or `framework:` tokens)
+> so the model cannot shortcut on advisory text. The headline hold-out
+> number is **70.8%** on disjoint advisory records; the real-code number
+> (**86.8%**) uses the same `to_token_sequence` code path the scanner emits
+> and is the honest production metric.
 
 The real-advisory model uses advisory description text (`txt:` features) as
 honest, non-label signal. For pure source-code scanning (no description
-available), train with `_build_synthetic.py` and validate via `RLTESTS/`.
+available), use the default code-only training via `train_final_only.py`
+and validate via `RLTESTS/`.
 
 ---
 

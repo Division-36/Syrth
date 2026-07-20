@@ -63,6 +63,12 @@ def _record_hash(r: dict) -> str:
 # NOT include the label (cwe:) — that would leak the answer.
 _ALLOWED_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "tainted", "severity", "framework", "txt", "txt2"}
 
+# Code-only mode: only tokens that syrth_scan.py emits at inference on real
+# source files.  Description text (txt:, txt2:, severity:, framework:, code:)
+# is excluded because it is never available at scan time.  This produces a
+# more honest and more accurate code-scanning model.
+_CODE_ONLY_PREFIX = {"def", "arg", "call", "sink", "ret", "meta", "flow", "tainted"}
+
 # Minimal English function-word stop list. Deliberately KEEPS security-domain
 # words (command, arbitrary, file, system, injection, traversal, redirect,
 # deserialization, script, query, sql, ...) — those are the discriminative
@@ -133,26 +139,53 @@ def build_desc_vocab(records: list[dict], top_k: int = 5000) -> set[str]:
     return set(t for t, _ in cnt.most_common(top_k))
 
 
-def re_tokenize(records: list[dict], desc_vocab: set[str] | None = None) -> list[dict]:
+def re_tokenize(records: list[dict], desc_vocab: set[str] | None = None,
+                code_only: bool = False) -> list[dict]:
+    """Re-tokenise records.
+
+    When *code_only* is True (the production default), keep ONLY the tokens
+    that syrth_scan.py emits at inference on real source files: AST-derived
+    structural tokens (def:/arg:/sink:/call:/ret:/@/meta:) and taint-flow
+    tokens (flow:/tainted:).  Description text (txt:/txt2:), severity,
+    framework, and backtick-derived ``code:`` tokens are excluded because they
+    are never available at scan time.
+
+    When *code_only* is False (legacy behaviour), the full token set including
+    description text is kept.
+    """
     out: list[dict] = []
     skipped = 0
     for r in records:
         desc = r.get("description") or r.get("summary") or ""
-        toks = H._build_advisory_tokens(desc, r.get("severity", ""), r.get("cwe_id", ""))
-        toks = [t for t in toks if _keep_token(t)]
-        # Advisory description text as honest (non-label) signal.
-        toks = toks + _desc_tokens(desc, desc_vocab)
-        if not toks and r.get("tokens"):
-            # No description (e.g. synthetic code-only records): preserve the
-            # original code-derived tokens so the inference vocabulary survives.
-            toks = [t for t in r["tokens"] if _keep_token(t)]
+        if code_only:
+            # ── Code-only path: AST tokens from fenced code blocks only ──
+            code_toks = H._tokens_from_advisory_code(desc)
+            toks = [t for t in code_toks if t.startswith(tuple(_CODE_ONLY_PREFIX))
+                    or t.startswith("@")]
+            # Synthetic records store code tokens in the tokens field directly.
+            if not toks and r.get("tokens"):
+                toks = [t for t in r["tokens"]
+                        if t.split(":", 1)[0] in _CODE_ONLY_PREFIX
+                        or t.startswith("@")]
+        else:
+            # ── Legacy path: description text + code tokens ──────────────
+            toks = H._build_advisory_tokens(desc, r.get("severity", ""),
+                                             r.get("cwe_id", ""))
+            toks = [t for t in toks if _keep_token(t)]
+            toks = toks + _desc_tokens(desc, desc_vocab)
+            if not toks and r.get("tokens"):
+                toks = [t for t in r["tokens"] if _keep_token(t)]
         if not toks:
             skipped += 1
             continue
         fixed = dict(r)
         fixed["tokens"] = toks
         out.append(fixed)
-    sys.stderr.write(f"[repair] re-tokenized {len(out)} records ({skipped} dropped: no tokens)\n")
+    mode_label = "code-only" if code_only else "description-inclusive"
+    sys.stderr.write(
+        f"[repair] re-tokenized {len(out)} records ({skipped} dropped, "
+        f"{mode_label})\n"
+    )
     return out
 
 
@@ -219,7 +252,14 @@ def main() -> None:
     ap.add_argument("--test", default="testingMassiveDataset.json")
     ap.add_argument("--top-k", type=int, default=DEFAULT_TOP_K,
                     help="Bound description vocabulary to top-K tokens (keeps C engine practical).")
+    ap.add_argument("--code-only", action="store_true", default=True,
+                    help="Strip all description features (txt/txt2/severity/framework). "
+                         "Produces a more honest and more accurate code-scanning model. [DEFAULT]")
+    ap.add_argument("--with-description", action="store_true", default=False,
+                    help="Include description text features (legacy mode, inflates headline accuracy).")
     args = ap.parse_args()
+
+    code_only = not args.with_description
 
     src = Path(args.src)
     train_out = Path(args.train)
@@ -232,10 +272,14 @@ def main() -> None:
     raw = json.loads(src.read_text(encoding="utf-8")).get("records", [])
     sys.stderr.write(f"[repair] loaded {len(raw)} raw records from {src}\n")
 
-    desc_vocab = build_desc_vocab(raw, top_k=args.top_k)
-    sys.stderr.write(f"[repair] description vocab bounded to {len(desc_vocab)} tokens (top_k={args.top_k})\n")
+    if code_only:
+        desc_vocab = None
+        sys.stderr.write("[repair] mode: CODE-ONLY (no description features)\n")
+    else:
+        desc_vocab = build_desc_vocab(raw, top_k=args.top_k)
+        sys.stderr.write(f"[repair] mode: description-inclusive (vocab={len(desc_vocab)} tokens)\n")
 
-    repaired = re_tokenize(raw, desc_vocab)
+    repaired = re_tokenize(raw, desc_vocab, code_only=code_only)
     train, test = split_train_test(repaired)
 
     # Sanity: prove no leakage between train and test.

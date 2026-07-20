@@ -223,18 +223,24 @@ echo '✅ C compiler working'
 ### Quick Start Test
 
 ```bash
-# 1. Generate small test dataset
+# 1. Harvest OSV PyPI data + synthetic samples
 python harvester.py
 
-# 2. Train model (quick test)
-python train_model.py --dataset _dataset.json
+# 2. Build a balanced 5-class dataset
+python _build_5class.py 3000 _full_dataset_5class.json
 
-# 3. Test scanning
+# 3. Re-tokenise (leak-free) and split train/test
+python repair_dataset.py --top-k 30000
+
+# 4. Train (Python + C engine export)
+python train_final_only.py
+
+# 5. Test scanning on a tainted snippet
 echo "def get_user(user_id):
     return db.execute('SELECT * FROM users WHERE id = ' + user_id)" > test.py
 python syrth_scan.py --file test.py --mode dev
 
-# 4. Run benchmark
+# 6. Run the latency/memory benchmark
 python benchmark.py
 ```
 
@@ -347,19 +353,25 @@ python -m venv dev-env
 source dev-env/bin/activate  # Linux/macOS
 # dev-env\Scripts\activate  # Windows
 
-# 3. Install in development mode
-pip install -e .
+# 3. Install dependencies
+pip install torch numpy scikit-learn joblib
 
-# 4. Install development dependencies
-pip install pytest black flake8 mypy
+# 4. Train a model so scans work
+python harvester.py
+python _build_5class.py 3000 _full_dataset_5class.json
+python repair_dataset.py --top-k 30000
+python train_final_only.py
 
-# 5. Run tests
-pytest tests/
-
-# 6. Format code
-black *.py
-flake8 *.py
+# 5. Run validation
+python eval_heldout.py
+python _eval_code.py
+python check_agree.py
+python RLTESTS/run_tests.py
 ```
+
+SYRTH has no `setup.py`/`pyproject.toml` yet, so it is run from the repo root
+(outside the venv, activate it first). Regression coverage lives in `RLTESTS/`
+and the accuracy scripts; add a `pytest` suite when extending detection.
 
 ### IDE Configuration
 
@@ -391,12 +403,14 @@ flake8 *.py
 
 After successful installation:
 
-1. **Generate Dataset**: `python harvester.py`
-2. **Train Model**: `python train_model.py`
-3. **Scan Code**: `python syrth_scan.py --file your_app.py`
-4. **Benchmark**: `python benchmark.py`
+1. **Build Dataset**: `python _build_5class.py 3000 _full_dataset_5class.json`
+2. **Repair / Split**: `python repair_dataset.py --top-k 30000`
+3. **Train Model**: `python train_final_only.py`
+4. **Scan Code**: `python syrth_scan.py --file your_app.py --mode dev`
+5. **Benchmark**: `python benchmark.py`
 
 For detailed usage, see:
 - [README.md](README.md) - General overview
 - [API.md](API.md) - API reference
-- [Examples/](../examples/) - Code examples
+- [EXAMPLES.md](EXAMPLES.md) - Code examples
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Development setup

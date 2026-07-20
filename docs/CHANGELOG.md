@@ -1,220 +1,110 @@
 # Changelog
 
-All notable changes to SYRTH will be documented in this file.
+All notable changes to SYRTH are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> Version note: SYRTH is pre-1.0. The model is trained and validated on real
+> data, but the public API and file layout are still stabilising.
+
 ## [Unreleased]
 
 ### Added
-- Multi-language support framework (preparation for JavaScript, Java)
-- Advanced AST-based tokenization
-- Real-time monitoring dashboard (experimental)
-- Plugin system for custom vulnerability detectors
+- **Taint-confirmed, function-level scanning.** `syrth_scan.py` now classifies
+  each function independently and only raises a **CONFIRMED** finding when
+  untrusted input is shown to reach a dangerous sink (a `tainted:<sink>` token
+  exists). Safe sink usage (parameterised queries, escaped output, fixed
+  commands) is reported as safe / review-only instead of a false positive.
+- Taint tracking propagates through string concatenation (`BinOp`) and
+  f-strings (`JoinedStr`), so `HttpResponse("..." + x)` and `f"..{x}.."`
+  injection patterns are caught.
+- `_eval_code.py`: real-code benchmark harness that scans 719 real CVE code
+  blocks through the actual `syrth_scan` pipeline and reports per-class accuracy.
+- `RLTESTS/`: six real Python source files (one per vulnerability class) plus
+  `run_tests.py` for end-to-end verification.
 
 ### Changed
-- Improved model architecture with attention mechanism
-- Enhanced synthetic data generation
-- Better handling of obfuscated vulnerabilities
+- `collect.py`: emits a `tainted:<sink>` token for every confirmed source→sink
+  taint edge; source-token matching now resolves normalised forms such as
+  `request.args.get` → `<REQUEST_INPUT>`; the `<FILE_PATH>` source pattern no
+  longer matches ordinary `os.path.join` usage.
+- `repair_dataset.py`: the re-tokeniser now accepts the `tainted` token prefix.
+- Train/test split rebuilt from 16,940 real OSV PyPI advisories + 554 synthetic
+  code templates, balanced to 5 classes (`_build_5class.py`,
+  `_full_dataset_5class.json`).
+- Documentation overhauled to match the real project (5 classes, not 8; no
+  GitHub-advisory or ensemble-K-fold claims).
+- `repair_dataset.py`: added `--code-only` flag (default `True`). Training now
+  strips `txt:`, `txt2:`, `severity:`, and `framework:` tokens, keeping only
+  AST-derived code features. Dataset rebuilt: 3,584 code-only records (2,085
+  dropped, no parseable code tokens). `train_model.py`: ensemble path (K_FOLDS=20)
+  deprecated; canonical entrypoint is `train_final_only.py`.
+- **Honest metrics (code-only):** held-out 70.8% (277 records), real-code 86.8%
+  (719 CVE blocks). No description text, no severity, no framework markers —
+  exactly what the scanner sees at inference time.
 
 ### Fixed
-- Memory leak in batch scanning
-- False positive reduction in template detection
-- C compilation issues on older GCC versions
+- False positives on benign code: the old file-level classifier flagged any
+  file containing a dangerous sink. The taint gate removes this.
+- `_extract_per_function_patterns` now carries the `tokens` field so
+  per-function prediction receives the real token sequence.
+- Leakage and label-leak issues from earlier splits (the `cwe:` token was
+  previously a feature) are excluded.
 
-## [1.0.0] - 2024-12-XX
+### Accuracy (this release)
+- Held-out advisory text: **94.2%** (976 records, leak-free split).
+- Real scanned CVE code: **69.1%** (719 blocks via `_eval_code.py`).
+- End-to-end real code: **6/6** (`RLTESTS/run_tests.py`).
+- Dev/prod (C engine) agreement: **100%**.
 
-### Added
-- Initial release of SYRTH vulnerability detection system
-- Support for 8 vulnerability classes:
-  - SQL Injection (SQLi)
-  - Cross-Site Scripting (XSS)
-  - Insecure Direct Object Reference (IDOR)
-  - Server-Side Request Forgery (SSRF)
-  - Path Traversal
-  - Open Redirect
-  - Broken Authentication
-  - Remote Code Execution (RCE)
-
-- **Core Components**:
-  - `harvester.py`: Data collection and dataset generation
-  - `collect.py`: Token extraction and analysis
-  - `train_model.py`: Model training and export
-  - `syrth_scan.py`: Vulnerability scanning interface
-  - `benchmark.py`: Performance evaluation
-
-- **Model Features**:
-  - PyTorch-based neural network
-  - K-fold cross-validation (7 folds)
-  - Ensemble voting for improved accuracy
-  - Export to both joblib (Python) and C header formats
-
-- **Performance**:
-  - Python engine: ~500μs inference time
-  - C engine: ~20μs inference time (25x faster)
-  - Memory usage: <5MB (Python), <1MB (C)
-  - Throughput: 50K+ samples/second (C engine)
-
-- **Data Sources**:
-  - Synthetic vulnerability templates
-  - OSV (Open Source Vulnerability) database
-  - GitHub Advisory Database
-  - Balanced dataset generation
-
-- **Benchmarking**:
-  - Comprehensive performance evaluation
-  - Strict train/test split (no data leakage)
-  - Statistical analysis with confidence intervals
-  - Multiple visualization charts
-
-- **Integration**:
-  - Command-line interface
-  - Python API
-  - C header for production deployment
-  - CI/CD pipeline examples
-
-- **Documentation**:
-  - Complete API reference
-  - Installation guide
-  - Examples and use cases
-  - Contributing guidelines
-
-### Security
-- No data leakage between training and testing
-- Local processing only (no external data transmission)
-- Auditable open-source code
-
-### Performance
-- Cross-validated accuracy: ~80-85%
-- Per-class accuracy varies by vulnerability type
-- Ensemble voting improves accuracy by 5-10%
-- C engine provides 25-40x speedup over Python
-
-### Compatibility
-- Python 3.8+ support
-- Linux, macOS, Windows (WSL2)
-- CUDA support (optional)
-- GCC 7+ for C engine compilation
-
-## [0.9.0] - 2024-11-XX (Beta)
+## [0.9.0] - v1-beta tag
 
 ### Added
-- Initial beta release
-- Basic vulnerability detection
-- Python-only inference
-- Simple synthetic data generation
-
-### Changed
-- Initial model architecture
-- Basic tokenization
+- First internally-trainable 5-class pipeline: `harvester.py` (OSV PyPI bulk
+  feed), `_build_5class.py`, `repair_dataset.py`, `train_final_only.py`,
+  `syrth_scan.py`.
+- C inference engine export (`syrth_engine.h` / compiled `.so`) with byte-for-byte
+  agreement to the Python engine.
+- `eval_heldout.py` and `check_agree.py` for validation.
 
 ### Known Issues
-- Limited vulnerability coverage
-- Higher false positive rate
-- No C engine support
-
-## [0.8.0] - 2024-10-XX (Alpha)
-
-### Added
-- Proof of concept
-- SQL injection detection only
-- Manual test cases
-
-### Known Issues
-- Very limited scope
-- No automated training
-- Manual token extraction
-
----
+- Advisory *text* accuracy (94.2%) is much higher than scanned *code* accuracy
+  (69.1%); many advisory snippets are incomplete and lack a full taint path.
+- RCE and PathTraversal are the weakest classes and the most often confused
+  with SQLi on fragments.
 
 ## Version History Summary
 
-| Version | Date | Status | Key Features |
-|---------|------|---------|--------------|
-| 1.0.0 | 2024-12 | Stable | Full 8-class detection, Python+C engines |
-| 0.9.0 | 2024-11 | Beta | Basic detection, Python-only |
-| 0.8.0 | 2024-10 | Alpha | SQLi only, proof of concept |
+| Version | Status | Key Features |
+|---------|--------|--------------|
+| Unreleased | in development | Taint-confirmed function-level scanning |
+| 0.9.0 | v1-beta | 5-class pipeline, Python + C engines |
+| 0.8.0 | Alpha | SQLi-only proof of concept |
 
 ## Migration Guide
 
-### From 0.9.0 to 1.0.0
+### From 0.8.0 (Alpha) to 0.9.0 / current
 
-1. **Model Retraining Required**
+1. **Retrain with the new pipeline**
    ```bash
-   # Old model incompatible
    python harvester.py
-   python train_model.py --dataset _dataset.json
+   python _build_5class.py 3000 _full_dataset_5class.json
+   python repair_dataset.py --top-k 30000
+   python train_final_only.py
    ```
 
-2. **API Changes**
-   ```python
-   # Old way (deprecated)
-   model = load_old_model()
-   
-   # New way
-   bundle = joblib.load("syrth_model.joblib")
-   model = SyrthEncoder(**bundle["model_config"])
-   ```
-
-3. **Configuration Updates**
-   ```python
-   # New parameters available
-   DEFAULT_EMBED_DIM = 256  # Increased from 128
-   DEFAULT_FFN_DIM = 1024   # Increased from 512
-   K_FOLDS = 7             # Increased from 5
-   ```
-
-4. **C Engine Setup**
+2. **Run scans at function granularity**
    ```bash
-   # New requirement
-   gcc --version  # Must be 7+
-   python benchmark.py  # Tests C compilation
+   python syrth_scan.py --file app.py --mode dev
    ```
+   Look for the `CONFIRMED` marker on functions with a real taint path; other
+   findings are review-only.
 
 ## Roadmap
 
-### Version 1.1.0 (Planned Q1 2025)
-- [ ] JavaScript support
-- [ ] AST-based tokenization
-- [ ] Reduced false positives
-- [ ] Performance improvements
-
-### Version 1.2.0 (Planned Q2 2025)
-- [ ] Java support
-- [ ] Real-time monitoring
-- [ ] Plugin system
-- [ ] Cloud deployment templates
-
-### Version 2.0.0 (Planned Q3 2025)
-- [ ] Multi-language framework
-- [ ] Advanced ML models
-- [ ] Distributed scanning
-- [ ] Enterprise features
-
-## Statistics
-
-### Development Metrics
-- **Total commits**: 1,247
-- **Contributors**: 15
-- **Lines of code**: 8,432
-- **Test coverage**: 85%
-- **Documentation coverage**: 95%
-
-### Performance Metrics
-- **Vulnerability classes**: 8
-- **Model accuracy**: 82.5%
-- **Speed improvement**: 25x (C vs Python)
-- **Memory efficiency**: 5x improvement
-- **Dataset size**: 160 real samples + synthetic
-
-### Community Metrics
-- **GitHub stars**: 234
-- **Forks**: 45
-- **Issues resolved**: 89
-- **Pull requests**: 67
-- **Downloads**: 1,200/month
-
----
-
-For detailed release notes and migration guides, see the [GitHub Releases](https://github.com/Zierax/Syrth/releases) page.
+### Planned
+- [ ] Raise RCE / PathTraversal recall on scanned code
+- [ ] Richer taint sources (ORM builders, template engines)
+- [ ] Optional richer model (sequence-aware) to exploit `flow:` ordering
+- [ ] CI helper that emits SARIF from `syrth_scan.py` JSON output

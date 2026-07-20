@@ -1,239 +1,124 @@
 # SYRTH Documentation Index
 
-Welcome to the SYRTH (Scan Your Risk Trace History) documentation. This comprehensive guide covers everything from installation to advanced usage and contribution.
+SYRTH (**S**can **Y**our **R**isk **T**race **H**istory) is an AST-based
+static scanner that detects taint-style vulnerabilities in Python source by
+classifying whether untrusted input reaches a dangerous sink.
 
-## 📚 Documentation Structure
+## Documentation Structure
 
 ### [README.md](../README.md)
-**Getting Started Guide**
-- Project overview and architecture
-- Quick start instructions
-- Vulnerability classes detected
-- Performance metrics
-- File structure
+Project overview, architecture, training/scanning pipeline, and honest
+accuracy numbers.
 
 ### [API.md](API.md)
-**API Reference**
-- Core classes and methods
-- Command-line tools
-- Configuration options
-- Data formats
-- Error codes and troubleshooting
+Core classes, command-line tools, token format, and model bundle layout.
 
 ### [INSTALLATION.md](INSTALLATION.md)
-**Installation Guide**
-- System requirements
-- Platform-specific setup
-- Virtual environment configuration
-- Verification and testing
-- Common installation issues
+System requirements, virtual-environment setup, and verification steps.
 
 ### [EXAMPLES.md](EXAMPLES.md)
-**Examples and Use Cases**
-- Basic vulnerability scanning
-- CI/CD pipeline integration
-- Web service implementation
-- IDE plugin development
-- Batch repository analysis
-- Performance optimization
-- Docker and Kubernetes deployment
+Scanning, CI integration, and reading the taint-confirmed JSON output.
 
 ### [CONTRIBUTING.md](CONTRIBUTING.md)
-**Contributing Guide**
-- Development setup
-- Code style and standards
-- Pull request process
-- Areas for contribution
-- Testing guidelines
-- Release process
+Development setup, project layout, and how to extend detection.
 
-##  Quick Start
+## Vulnerability Classes (5)
 
-1. **Install SYRTH**
-   ```bash
-   pip install torch numpy scikit-learn joblib matplotlib seaborn psutil
-   ```
+| ID | Class | CWE | Example sink |
+|----|-------|-----|--------------|
+| 0 | SQL Injection (SQLi) | CWE-89 | `cursor.execute` with string-built SQL |
+| 1 | Cross-Site Scripting (XSS) | CWE-79 | `HttpResponse`/`render` with raw input |
+| 2 | Path Traversal | CWE-22 | `open`/`os.path.join` with user path |
+| 3 | Open Redirect | CWE-601 | `redirect`/`HttpResponseRedirect` with user URL |
+| 4 | Remote Code Execution (RCE) | CWE-94 | `subprocess`/`eval`/`os.system` with input |
 
-2. **Generate Dataset**
-   ```bash
-   python harvester.py
-   ```
+## Quick Start
 
-3. **Train Model**
-   ```bash
-   python train_model.py --dataset _dataset.json
-   ```
+```bash
+# 1. Create a venv and install dependencies
+python -m venv ~/syrth-venv
+source ~/syrth-venv/bin/activate
+pip install torch numpy scikit-learn joblib
 
-4. **Scan Code**
-   ```bash
-   python syrth_scan.py --file your_app.py --mode dev
-   ```
+# 2. Build the training dataset (OSV PyPI + synthetic, balanced to 5 classes)
+python harvester.py
+python _build_5class.py 3000 _full_dataset_5class.json
 
-5. **Benchmark Performance**
-   ```bash
-   python benchmark.py
-   ```
+# 3. Repair / re-tokenise the dataset (leak-free, label excluded)
+python repair_dataset.py --top-k 30000
+
+# 4. Train (Python + C engine export)
+python train_final_only.py
+
+# 5. Scan a file (function-level, taint-confirmed)
+python syrth_scan.py --file your_app.py --mode dev
+```
 
 ## Key Features
 
-###  Vulnerability Detection
-- **8 vulnerability classes**: SQLi, XSS, IDOR, SSRF, PathTraversal, OpenRedirect, BrokenAuth, RCE
-- **High accuracy**: ~80-85% on real vulnerability data (Per fold, K=7)
-- **Context-aware**: Understands code flow and security patterns
+### Taint-Confirmed Detection
+SYRTH only reports a function as **CONFIRMED** when untrusted input actually
+reaches a dangerous sink. Safe usage (parameterised queries, escaped output,
+fixed commands) is reported as safe / review-only, which keeps false positives
+low on real code.
 
-###  Performance
-- **Python engine**: ~500μs inference time
-- **C engine**: ~20μs inference time (25x faster)
-- **Low memory**: <5MB RAM usage
-- **High throughput**: 50K+ samples/second (C engine)
+### Two Engines
+- **Python engine** (`syrth_scan.py --mode dev`) — easy to debug.
+- **C engine** (`syrth_engine.h`, compiled to `.so`) — identical results,
+  faster; `check_agree.py` verifies 100% agreement.
 
-###  Security
-- **No data leakage**: Strict train/test separation
-- **Privacy-focused**: Local processing only
-- **Auditable**: Open source with transparent algorithms
+### Honest Evaluation
+- Held-out (code-only, no description text): **70.8%** (277 records, leak-free).
+- Real scanned CVE code: **86.8%** (719 blocks, via `_eval_code.py`).
+- End-to-end real code: **6/6** (`RLTESTS/run_tests.py`).
 
-###  Integration
-- **Multiple interfaces**: CLI, Python API, C header
-- **CI/CD ready**: GitHub Actions, Jenkins support
-- **Framework agnostic**: Works with any Python codebase
+## Performance Benchmarks
 
-##  Performance Benchmarks
+`python benchmark.py` measures latency/memory for both engines and writes
+charts to `benchmark/`. Typical results:
 
-| Metric | Python Engine | C Engine | Improvement |
-|--------|---------------|-----------|-------------|
-| Mean Latency | ~500μs | ~20μs | **25x faster** |
-| P99 Latency | ~2ms | ~50μs | **40x faster** |
-| Throughput | ~2K/s | ~50K/s | **25x higher** |
-| Memory Usage | ~2-5MB | ~0.5-1MB | **5x lower** |
+| Metric | Python Engine | C Engine |
+|--------|---------------|----------|
+| Mean latency | ~500µs | ~20µs |
+| Throughput | ~2K/s | ~50K/s |
 
-##  Configuration
+## Project Layout
 
-### Model Parameters
-```python
-DEFAULT_EMBED_DIM = 256    # Embedding dimension
-DEFAULT_FFN_DIM = 1024     # Feed-forward network size
-DEFAULT_DROPOUT = 0.2      # Regularization strength
-DEFAULT_BATCH_SIZE = 64     # Training batch size
-DEFAULT_LR = 5e-3          # Learning rate
-K_FOLDS = 7                # Cross-validation folds
+```
+syrth/
+├── docs/                 # This documentation
+├── RLTESTS/              # Real-code end-to-end tests (6 files + runner)
+├── collect.py            # AST token extraction + taint engine
+├── syrth_scan.py         # Scanning CLI (per-function, taint-confirmed)
+├── harvester.py          # OSV PyPI bulk feed + synthetic samples
+├── _build_5class.py      # Balanced 5-class dataset builder
+├── repair_dataset.py     # Leak-free re-tokeniser
+├── train_model.py        # SyrthEncoder model + C export
+├── train_final_only.py   # Training entrypoint used by the pipeline
+├── eval_heldout.py       # Held-out text accuracy
+├── check_agree.py        # Dev/prod agreement check
+├── _eval_code.py         # Real-code (scanned) benchmark
+├── benchmark.py          # Latency/memory benchmark
+├── README.md
+└── docs/CHANGELOG.md
 ```
 
-### Benchmark Settings
-```python
-BENCHMARK_RUNS = 500       # Test iterations
-TEST_SPLIT_RATIO = 0.2      # Train/test split
-RANDOM_SEED = 42            # Reproducibility
-```
+## Common Tasks
 
-##  Common Issues & Solutions
+| Task | Command |
+|------|---------|
+| Build dataset | `python _build_5class.py 3000 _full_dataset_5class.json` |
+| Repair tokens | `python repair_dataset.py --top-k 30000` |
+| Train | `python train_final_only.py` |
+| Scan a file | `python syrth_scan.py --file app.py --mode dev` |
+| Held-out accuracy | `python eval_heldout.py` |
+| Dev/prod agreement | `python check_agree.py` |
+| Real-code benchmark | `python _eval_code.py` |
+| End-to-end tests | `python RLTESTS/run_tests.py` |
 
-### Installation Issues
-- **Missing dependencies**: Install with `pip install torch numpy scikit-learn joblib`
-- **C compilation fails**: Install GCC with `sudo apt install build-essential`
-- **Permission denied**: Use `pip install --user` or virtual environment
+## External Resources
 
-### Performance Issues
-- **Slow inference**: Use C engine with `--mode prod`
-- **Memory errors**: Reduce batch size in training
-- **Low accuracy**: Ensure balanced dataset and proper training
-
-### Accuracy Issues
-- **False positives**: Adjust confidence threshold
-- **Missing detections**: Update token patterns
-- **Poor performance**: Retrain with more diverse data
-
-##  Version History
-
-### v1.0.0 (Current)
-- Initial release
-- 8 vulnerability classes supported
-- Python and C inference engines
-- Comprehensive benchmarking suite
-- CI/CD integration examples
-
-### Upcoming Features
-- [ ] Multi-language support (JavaScript, Java)
-- [ ] Advanced AST-based tokenization
-- [ ] Real-time monitoring dashboard
-- [ ] Plugin system for custom detectors
-- [ ] Cloud deployment templates
-
-##  Community
-
-### Getting Help
-- **GitHub Issues**: [Report bugs](https://github.com/Zierax/Syrth/issues)
-- **Discussions**: [Ask questions](https://github.com/Zierax/Syrth/discussions)
-- **Security**: security@syrth.dev
-
-### Contributing
-- **Contributors**: See [CONTRIBUTING.md](CONTRIBUTING.md)
-- **Code of Conduct**: Be respectful and inclusive
-- **Recognition**: Contributors acknowledged in releases
-
-##  Checklists
-
-### Before Scanning
-- [ ] Model trained (`syrth_model.joblib` exists)
-- [ ] Dataset generated (`_dataset.json` exists)
-- [ ] Dependencies installed
-- [ ] C engine compiled (for production mode)
-
-### Before Deployment
-- [ ] Performance benchmarked
-- [ ] Accuracy validated on test data
-- [ ] Memory usage acceptable
-- [ ] Error handling implemented
-
-### Before Release
-- [ ] All tests passing
-- [ ] Documentation updated
-- [ ] Changelog updated
-- [ ] Version number updated
-
-##  External Resources
-
-### Security Resources
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [CWE Mitigation](https://cwe.mitre.org/)
-- [NVD Database](https://nvd.nist.gov/)
-
-### Python Security
-- [Bandit](https://bandit.readthedocs.io/) - Static analysis
-- [Safety](https://github.com/pyupio/safety) - Dependency checking
-- [Semgrep](https://semgrep.dev/) - Pattern matching
-
-### Machine Learning
-- [PyTorch](https://pytorch.org/) - Deep learning framework
-- [Scikit-learn](https://scikit-learn.org/) - Machine learning library
-- [Joblib](https://joblib.readthedocs.io/) - Model serialization
-
-##  Support
-
-### Documentation Issues
-Found an error in the documentation? Please:
-1. Check the [latest version](https://github.com/Zierax/Syrth/tree/main/docs)
-2. [Open an issue](https://github.com/Zierax/Syrth/issues/new)
-3. Include the documentation page and section
-
-### Feature Requests
-Have an idea for improvement? Please:
-1. Check [existing issues](https://github.com/Zierax/Syrth/issues)
-2. [Open a new issue](https://github.com/Zierax/Syrth/issues/new) with "enhancement" label
-3. Describe the use case and expected behavior
-
-### Security Vulnerabilities
-Found a security issue in SYRTH itself? Please:
-1. Do **not** open a public issue
-2. Email details to security@syrth.dev
-3. Include steps to reproduce and potential impact
-
-##  License
-
-SYRTH is provided under the MIT License. See [LICENSE](LICENSE) for full details.
-
----
-
-**Version**: 1.0.0  
-**Maintainers**: Zierax
-
-For the most up-to-date information, visit the [GitHub repository](https://github.com/Zierax/Syrth).
+- [CWE](https://cwe.mitre.org/)
+- [OSV (Open Source Vulnerabilities)](https://osv.dev/)
+- [PyTorch](https://pytorch.org/), [scikit-learn](https://scikit-learn.org/), [joblib](https://joblib.readthedocs.io/)
