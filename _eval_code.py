@@ -25,7 +25,11 @@ BUNDLE = joblib.load("syrth_model.joblib")
 TOK = T.SyrthTokenizer()
 TOK.vocab = BUNDLE["tokenizer_vocab"]
 UNK = TOK.vocab.get("<UNK>", 0)
-MODEL = T.SyrthEncoder(vocab_size=len(TOK.vocab))
+_cfg = BUNDLE.get("model_config", {})
+embed_dim = _cfg.get("embed_dim", T.DEFAULT_EMBED_DIM)
+ffn_dim = _cfg.get("ffn_dim", T.DEFAULT_FFN_DIM)
+aux_dim = _cfg.get("aux_dim", 0)
+MODEL = T.SyrthEncoder(vocab_size=len(TOK.vocab), embed_dim=embed_dim, ffn_dim=ffn_dim, aux_dim=aux_dim)
 MODEL.load_state_dict({k: torch.as_tensor(v) for k, v in BUNDLE["model_state_dict"].items()})
 MODEL.eval()
 
@@ -45,8 +49,9 @@ def predict_code(src: str):
     if not seq:
         return None
     x = torch.tensor([[TOK.vocab.get(t, UNK) for t in seq]])
+    aux = T._extract_aux_features(x, TOK.vocab)
     with torch.no_grad():
-        out = MODEL(x)
+        out = MODEL(x, aux)
     probs = F.softmax(out, 1)[0]
     return int(probs.argmax()), float(probs.max())
 

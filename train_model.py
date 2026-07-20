@@ -82,6 +82,9 @@ DEFAULT_EMBED_DIM = 256  # Larger embeddings for better capacity
 DEFAULT_FFN_DIM = 1024   # Wider MLP for better capacity
 DEFAULT_DROPOUT = 0.2   # Stronger regularization
 DEFAULT_BATCH_SIZE = 64  # Smaller batches for faster convergence
+
+# Auxiliary feature dimension: sink-category flags + structural signals
+AUX_DIM = 14
 DEFAULT_LR = 5e-3  # Higher learning rate for faster convergence
 DEFAULT_EPOCHS = 100  # Fewer epochs for faster convergence
 
@@ -144,11 +147,83 @@ class VulnDataset(Dataset):
 
 # ── Model ───────────────────────────────────────────────────────────────────
 
+def _extract_aux_features(token_ids: torch.Tensor, vocab: dict[str, int]) -> torch.Tensor:
+    """Extract auxiliary features from a batch of token ID sequences.
+
+    Returns (batch, AUX_DIM) tensor with:
+      [0]  sink_count         — number of sink:* tokens (normalized)
+      [1]  has_taint          — 1 if any tainted:* token present
+      [2]  num_flow_edges     — count of flow:* tokens (normalized)
+      [3]  has_request_input  — 1 if <REQUEST_INPUT> present
+      [4]  has_no_auth        — 1 if meta:no_auth present
+      [5]  scat_sql           — 1 if SCAT:SQL present
+      [6]  scat_xss           — 1 if SCAT:XSS present
+      [7]  scat_file          — 1 if SCAT:FILE present
+      [8]  scat_exec          — 1 if SCAT:EXEC present
+      [9]  scat_net           — 1 if SCAT:NET present
+      [10] scat_redirect      — 1 if SCAT:REDIRECT present
+      [11] scat_deser         — 1 if SCAT:DESER present
+      [12] seq_len            — normalized sequence length
+      [13] has_sql_string     — 1 if has_sql_string token
+    """
+    batch_size = token_ids.shape[0]
+    aux = torch.zeros(batch_size, AUX_DIM, device=token_ids.device)
+
+    # Build reverse vocab: id -> token string
+    inv_vocab = {v: k for k, v in vocab.items()}
+
+    for b in range(batch_size):
+        ids = token_ids[b].tolist()
+        sink_count = 0
+        flow_count = 0
+        seq_len = 0
+        for tid in ids:
+            if tid == 0:
+                continue
+            seq_len += 1
+            tok = inv_vocab.get(tid, "")
+            if tok.startswith("sink:"):
+                sink_count += 1
+            if tok.startswith("tainted:"):
+                aux[b, 1] = 1.0
+            if tok.startswith("flow:"):
+                flow_count += 1
+            if "<REQUEST_INPUT>" in tok:
+                aux[b, 3] = 1.0
+            if tok == "meta:no_auth":
+                aux[b, 4] = 1.0
+            if tok == "SCAT:SQL":
+                aux[b, 5] = 1.0
+            if tok == "SCAT:XSS":
+                aux[b, 6] = 1.0
+            if tok == "SCAT:FILE":
+                aux[b, 7] = 1.0
+            if tok == "SCAT:EXEC":
+                aux[b, 8] = 1.0
+            if tok == "SCAT:NET":
+                aux[b, 9] = 1.0
+            if tok == "SCAT:REDIRECT":
+                aux[b, 10] = 1.0
+            if tok == "SCAT:DESER":
+                aux[b, 11] = 1.0
+            if tok == "sink:execute":
+                aux[b, 13] = 1.0
+
+        aux[b, 0] = min(sink_count / 5.0, 1.0)
+        aux[b, 2] = min(flow_count / 3.0, 1.0)
+        aux[b, 12] = min(seq_len / MAX_SEQ_LEN, 1.0)
+
+    return aux
+
+
 class SyrthEncoder(nn.Module):
-    """Simple Bag-of-Words + MLP classifier for vulnerability detection.
-    
-    Much more effective than Transformers on tiny datasets.
-    Architecture: Embedding -> Mean Pooling -> MLP -> Output
+    """Embedding + MeanPool + Aux Features + MLP classifier.
+
+    Architecture: Embedding -> MeanPool + AuxFeats -> MLP -> Output
+
+    Key improvement over v1: auxiliary features provide structural signals
+    (SCAT categories, taint presence, flow counts) that help distinguish
+    vulnerability classes even without taint traces.
     """
 
     def __init__(
@@ -158,16 +233,20 @@ class SyrthEncoder(nn.Module):
         ffn_dim: int = DEFAULT_FFN_DIM,
         num_classes: int = NUM_CLASSES,
         dropout: float = DEFAULT_DROPOUT,
+        aux_dim: int = AUX_DIM,
     ) -> None:
         super().__init__()
         self.embed_dim = embed_dim
-        self.ffn_dim = ffn_dim  # Store for export
+        self.ffn_dim = ffn_dim
+        self.aux_dim = aux_dim
+
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=0)
         self.dropout = nn.Dropout(dropout)
 
-        # Deeper MLP head for better capacity
+        # MLP head: input = embed_dim + aux_dim
+        mlp_input = embed_dim + aux_dim
         self.head = nn.Sequential(
-            nn.Linear(embed_dim, ffn_dim),
+            nn.Linear(mlp_input, ffn_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(ffn_dim, ffn_dim // 2),
@@ -179,7 +258,6 @@ class SyrthEncoder(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
-        """Xavier initialization for better convergence."""
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
@@ -188,18 +266,24 @@ class SyrthEncoder(nn.Module):
             elif isinstance(m, nn.Embedding):
                 nn.init.normal_(m.weight, mean=0, std=0.01)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, aux: torch.Tensor | None = None) -> torch.Tensor:
         padding_mask = x == 0
         embeds = self.embedding(x)
+
         # Mean pool with proper masking
         mask_float = (~padding_mask).float().unsqueeze(-1)
         pooled = (embeds * mask_float).sum(dim=1) / mask_float.sum(dim=1).clamp(min=1.0)
         pooled = self.dropout(pooled)
+
+        # Concatenate auxiliary features if provided
+        if aux is not None and self.aux_dim > 0:
+            pooled = torch.cat([pooled, aux], dim=-1)
+
         return self.head(pooled)
 
-    def predict_proba(self, x: torch.Tensor) -> torch.Tensor:
+    def predict_proba(self, x: torch.Tensor, aux: torch.Tensor | None = None) -> torch.Tensor:
         with torch.no_grad():
-            return F.softmax(self.forward(x), dim=-1)
+            return F.softmax(self.forward(x, aux), dim=-1)
 
 
 # ── Training & Evaluation ───────────────────────────────────────────────────
@@ -213,11 +297,17 @@ def _train_epoch(
 ) -> float:
     model.train()
     total_loss = 0.0
-    for x_batch, y_batch in loader:
+    for batch in loader:
+        if len(batch) == 3:
+            x_batch, aux_batch, y_batch = batch
+            aux_batch = aux_batch.to(device)
+        else:
+            x_batch, y_batch = batch
+            aux_batch = None
         x_batch = x_batch.to(device)
         y_batch = y_batch.to(device)
         optimizer.zero_grad()
-        logits = model(x_batch)
+        logits = model(x_batch, aux_batch)
         loss = criterion(logits, y_batch)
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -231,11 +321,13 @@ def _eval_model(
     X: torch.Tensor,
     y: torch.Tensor,
     device: torch.device,
+    aux: torch.Tensor | None = None,
 ) -> Dict[str, float]:
     """Comprehensive evaluation with sklearn metrics."""
     model.eval()
     with torch.no_grad():
-        probs = model.predict_proba(X.to(device))
+        aux_d = aux.to(device) if aux is not None else None
+        probs = model.predict_proba(X.to(device), aux_d)
         preds = probs.argmax(dim=-1).cpu().numpy()
         y_np = y.cpu().numpy()
 
@@ -263,13 +355,14 @@ def train_final(
     lr: float = DEFAULT_LR,
     device: torch.device | None = None,
     class_weight: torch.Tensor | None = None,
+    aux_val: torch.Tensor | None = None,
 ) -> SyrthEncoder:
     """Train model with early stopping based on validation F1."""
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=5e-3)  # Stronger regularization
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=5e-3)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
     weight = class_weight.to(device) if class_weight is not None else None
     criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING, weight=weight)
@@ -281,7 +374,7 @@ def train_final(
     for epoch in range(1, epochs + 1):
         train_loss = _train_epoch(model, train_loader, optimizer, criterion, device)
 
-        val_results = _eval_model(model, X_val, y_val, device)
+        val_results = _eval_model(model, X_val, y_val, device, aux=aux_val)
         val_f1 = val_results["f1"]
 
         scheduler.step(val_f1)  # ReduceLROnPlateau needs metric

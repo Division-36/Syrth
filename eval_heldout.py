@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from train_model import SyrthEncoder, SyrthTokenizer, MAX_SEQ_LEN, NUM_CLASSES  # noqa: E402
+from train_model import SyrthEncoder, SyrthTokenizer, MAX_SEQ_LEN, NUM_CLASSES, _extract_aux_features  # noqa: E402
 from syrth_scan import CLASS_NAMES  # noqa: E402
 
 
@@ -50,10 +50,11 @@ def main() -> int:
     import torch
     model = SyrthEncoder(
         vocab_size=cfg["vocab_size"],
-        embed_dim=cfg["embed_dim"],
-        ffn_dim=cfg.get("ffn_dim", 128),
+        embed_dim=cfg.get("embed_dim", 256),
+        ffn_dim=cfg.get("ffn_dim", 1024),
         num_classes=cfg["num_classes"],
         dropout=0.0,
+        aux_dim=cfg.get("aux_dim", 0),
     )
     state = {k: torch.from_numpy(v.astype(np.float32)) for k, v in bundle["model_state_dict"].items()}
     model.load_state_dict(state)
@@ -74,7 +75,8 @@ def main() -> int:
         for toks, label in samples:
             ids = tok.encode(toks)
             x = torch.tensor([ids], dtype=torch.long)
-            probs = torch.softmax(model(x), dim=-1)[0].numpy()
+            aux = _extract_aux_features(x, vocab)
+            probs = torch.softmax(model(x, aux), dim=-1)[0].numpy()
             pred = int(np.argmax(probs))
             y_true.append(label)
             y_pred.append(pred)

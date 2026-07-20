@@ -1,4 +1,4 @@
-"""Fast single-model training: train on ALL data (no 20-fold CV), export bundle.
+"""Fast single-model training: train on ALL data, export bundle.
 
 Usage: python train_final_only.py [--dataset _balanced_dataset.json]
 """
@@ -54,7 +54,7 @@ def main() -> int:
     w = w / w.mean()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SyrthEncoder(vocab_size=tokenizer.vocab_size())
+    model = SyrthEncoder(vocab_size=tokenizer.vocab_size(), aux_dim=0)
 
     train_ds = TensorDataset(X_t[tr_idx], y_t[tr_idx])
     train_loader = DataLoader(train_ds, batch_size=DEFAULT_BATCH_SIZE, shuffle=True)
