@@ -80,6 +80,8 @@ def _dev_predict(tokens: list[str], bundle: dict[str, Any]) -> list[tuple[str, f
     sys.path.insert(0, str(Path(__file__).parent))
     from train_model import SyrthEncoder, SyrthTokenizer, MAX_SEQ_LEN
 
+    import numpy as np
+
     # Ensemble bundle (5 models)
     if "ensemble" in bundle:
         tok = SyrthTokenizer()
@@ -96,7 +98,6 @@ def _dev_predict(tokens: list[str], bundle: dict[str, Any]) -> list[tuple[str, f
                 dropout=0.0,
                 aux_dim=0,
             )
-            import numpy as np
             state = {k: torch.from_numpy(v.astype(np.float32)) for k, v in mdata["state_dict"].items()}
             model.load_state_dict(state)
             model.eval()
@@ -110,6 +111,55 @@ def _dev_predict(tokens: list[str], bundle: dict[str, Any]) -> list[tuple[str, f
                 probs = F.softmax(model(x), dim=-1)[0]
                 votes += probs * weight
             probs = (votes / votes.sum()).numpy()
+
+        # Try meta-learner refinement
+        meta_path = Path(__file__).parent / "syrth_meta.joblib"
+        if meta_path.exists():
+            try:
+                from sklearn.linear_model import LogisticRegression
+                from _rules import classify_by_rules
+                meta_bundle = joblib.load(str(meta_path))
+                lr = LogisticRegression(solver='lbfgs', max_iter=1000, C=1.0, random_state=42)
+                lr.coef_ = np.array(meta_bundle["meta_model"]["coef"])
+                lr.intercept_ = np.array(meta_bundle["meta_model"]["intercept"])
+                lr.classes_ = np.array(meta_bundle["meta_model"]["classes"])
+                lr.n_features_in_ = meta_bundle["meta_config"]["num_features"]
+
+                # Build meta features
+                pred = int(votes.argmax())
+                conf = float(probs[pred])
+                rule_result = classify_by_rules(tokens)
+                rule_cls = rule_result.predicted_class
+                rule_cf = rule_result.confidence
+                rule_vt = rule_result.votes.total()
+                has_t = any(t.startswith("tainted:") for t in tokens)
+
+                feats = []
+                feats.extend(float(votes[i]) for i in range(5))
+                feats.append(conf)
+                feats.extend(1.0 if i == pred else 0.0 for i in range(5))
+                feats.append(1.0 if has_t else 0.0)
+                feats.append(rule_cf)
+                feats.append(min(rule_vt / 10.0, 1.0))
+                if rule_vt > 0:
+                    feats.extend(1.0 if i == rule_cls else 0.0 for i in range(5))
+                else:
+                    feats.extend([0.0] * 5)
+                feats.append(1.0 if rule_vt > 0 else 0.0)
+
+                meta_pred = int(lr.predict(np.array(feats, dtype=np.float32).reshape(1, -1))[0])
+                if meta_pred != pred:
+                    # Swap probabilities: boost meta-predicted class
+                    meta_probs = probs.copy()
+                    orig = meta_probs[meta_pred]
+                    rce_i = 4
+                    if meta_pred != rce_i:
+                        meta_probs[meta_pred] = meta_probs[rce_i]
+                        meta_probs[rce_i] = orig
+                    meta_probs = meta_probs / meta_probs.sum()
+                    probs = meta_probs
+            except Exception:
+                pass  # Meta-learner failed, use raw ensemble
 
         return sorted(
             zip(CLASS_NAMES, probs.tolist()),
