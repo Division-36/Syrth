@@ -117,12 +117,35 @@ def _extract_text_features(source_code):
     return feats
 
 meta_bundle = joblib.load("syrth_meta.joblib")
-meta_lr = LogisticRegression(solver='lbfgs', max_iter=2000, class_weight='balanced', C=1.0, random_state=42)
-meta_lr.coef_ = np.array(meta_bundle["meta_model"]["coef"])
-meta_lr.intercept_ = np.array(meta_bundle["meta_model"]["intercept"])
-meta_lr.classes_ = np.array(meta_bundle["meta_model"]["classes"])
-meta_lr.n_features_in_ = meta_bundle["meta_config"]["num_features"]
-print(f"Loaded meta-learner: {meta_lr.n_features_in_} features, {len(meta_lr.classes_)} classes")
+meta_config = meta_bundle.get("meta_config", {})
+num_features = meta_config.get("num_features", 49)
+
+# Support both single model and ensemble of meta-learners
+meta_models = []
+if "meta_models" in meta_bundle:
+    for md in meta_bundle["meta_models"]:
+        lr = LogisticRegression(solver='lbfgs', max_iter=2000, class_weight='balanced', C=md.get("C", 1.0), random_state=42)
+        lr.coef_ = np.array(md["coef"])
+        lr.intercept_ = np.array(md["intercept"])
+        lr.classes_ = np.array(md["classes"])
+        lr.n_features_in_ = num_features
+        meta_models.append(lr)
+    meta_model_type = f"Ensemble({len(meta_models)} LRs)"
+elif "meta_model" in meta_bundle:
+    md = meta_bundle["meta_model"]
+    if "model" in meta_bundle:
+        meta_models = [meta_bundle["model"]]
+        meta_model_type = md.get("model_type", "unknown")
+    else:
+        lr = LogisticRegression(solver='lbfgs', max_iter=2000, class_weight='balanced', C=1.0, random_state=42)
+        lr.coef_ = np.array(md["coef"])
+        lr.intercept_ = np.array(md["intercept"])
+        lr.classes_ = np.array(md["classes"])
+        lr.n_features_in_ = num_features
+        meta_models = [lr]
+        meta_model_type = "LogisticRegression"
+
+print(f"Loaded meta-learner: {meta_model_type}, {num_features} features")
 
 
 def extract_meta_features(tokens, source_code=None):
@@ -136,6 +159,7 @@ def extract_meta_features(tokens, source_code=None):
     has_taint = any(t.startswith("tainted:") for t in tokens)
 
     token_set = set(tokens)
+    token_list = tokens
     n_tokens = max(len(tokens), 1)
 
     rce_sinks = sum(1 for t in tokens if t.startswith("sink:") and t[5:] in RCE_SINKS)
@@ -234,7 +258,94 @@ def extract_meta_features(tokens, source_code=None):
     else:
         feats.extend([0.0] * 10)
 
-    return np.array(feats, dtype=np.float32)
+    # ============================================================
+    # v5 features: argument/call pattern analysis
+    # ============================================================
+    arg_tokens = [t for t in tokens if t.startswith("arg:")]
+    arg_names = set(t[4:].lower() for t in arg_tokens)
+
+    # [49-53] Argument name pattern features
+    sqli_args = any(a in arg_names for a in ["db", "query", "database", "table", "sql", "cursor", "connection"])
+    feats.append(1.0 if sqli_args else 0.0)
+    pt_args = any(a in arg_names for a in ["path", "file", "dir", "folder", "filename", "filepath", "<file_path>"])
+    feats.append(1.0 if pt_args else 0.0)
+    xss_args = any(a in arg_names for a in ["html", "template", "content", "render", "response", "text"])
+    feats.append(1.0 if xss_args else 0.0)
+    or_args = any(a in arg_names for a in ["url", "redirect", "next", "callback", "target", "return_url", "<url_param>"])
+    feats.append(1.0 if or_args else 0.0)
+    rce_args = any(a in arg_names for a in ["cmd", "command", "exec", "code", "payload", "<secret>"])
+    feats.append(1.0 if rce_args else 0.0)
+
+    # [54-58] Specific call pattern features
+    sqli_calls = False
+    for t in tokens:
+        if t.startswith("call:"):
+            callee = t[5:].lower()
+            if any(x in callee for x in ["select", "where", "filter", "query", "execute"]):
+                sqli_calls = True
+                break
+    feats.append(1.0 if sqli_calls else 0.0)
+
+    xss_calls = False
+    for t in tokens:
+        ct = t.lstrip("@").lower()
+        if any(x in ct for x in ["app.get", "app.post", "render", "response", "mark_safe", "format_html"]):
+            xss_calls = True
+            break
+    feats.append(1.0 if xss_calls else 0.0)
+
+    pt_calls = False
+    for t in tokens:
+        if t.startswith("call:"):
+            callee = t[5:].lower()
+            if any(x in callee for x in ["os.path", "path(", "open(", "isfile", "isdir", "exists"]):
+                pt_calls = True
+                break
+    feats.append(1.0 if pt_calls else 0.0)
+
+    or_calls = False
+    for t in tokens:
+        if t.startswith("call:"):
+            callee = t[5:].lower()
+            if any(x in callee for x in ["redirect", "httpurlredirect", "location"]):
+                or_calls = True
+                break
+    feats.append(1.0 if or_calls else 0.0)
+
+    rce_calls = False
+    for t in tokens:
+        if t.startswith("def:"):
+            func = t[4:].lower()
+            if func in ("__reduce__", "__reduce_ex__", "__getstate__", "__setstate__"):
+                rce_calls = True
+                break
+        if t.startswith("call:"):
+            callee = t[5:].lower()
+            if any(x in callee for x in ["pickle", "yaml.load", "marshal", "torch.load"]):
+                rce_calls = True
+                break
+    feats.append(1.0 if rce_calls else 0.0)
+
+    # [59-63] Decorator features
+    feats.append(1.0 if any(tk.startswith("@app.get") or tk=="call:app.get" for tk in token_list) else 0.0)
+    feats.append(1.0 if any(tk.startswith("@app.post") or tk=="call:app.post" for tk in token_list) else 0.0)
+    feats.append(1.0 if any(tk.startswith("@") and ("route" in tk or "get" in tk or "post" in tk) for tk in token_list) else 0.0)
+    feats.append(1.0 if any(tk=="decorator:@property" for tk in token_list) else 0.0)
+    feats.append(1.0 if any(tk=="decorator:@staticmethod" for tk in token_list) else 0.0)
+
+    # [64-68] Argument name count ratios
+    n_args = max(len(arg_tokens),1)
+    feats.append(min(sum(1 for a in arg_names if "sql" in a or "db" in a or "query" in a)/n_args,1.0))
+    feats.append(min(sum(1 for a in arg_names if "path" in a or "file" in a or "dir" in a)/n_args,1.0))
+    feats.append(min(sum(1 for a in arg_names if "html" in a or "template" in a or "render" in a)/n_args,1.0))
+    feats.append(min(sum(1 for a in arg_names if "url" in a or "redirect" in a or "next" in a)/n_args,1.0))
+    feats.append(min(sum(1 for a in arg_names if "cmd" in a or "exec" in a or "code" in a)/n_args,1.0))
+
+    all_feats = np.array(feats, dtype=np.float32)
+
+    # Remove noisy features (rule_feats 12-18, sink_ratios 19-25, sink_taint_count 26-27)
+    keep = list(range(0, 12)) + list(range(28, len(all_feats)))
+    return all_feats[keep]
 
 
 def predict_meta(src, full_desc=None):
@@ -252,15 +363,26 @@ def predict_meta(src, full_desc=None):
             for t in s:
                 if t.startswith("tainted:"):
                     sink_name = t.split(":", 1)[1]
-                    if sink_name in ("execute", "cursor.execute", "raw", "extra"):
+                    if sink_name in ("execute", "cursor.execute", "raw", "extra",
+                                     "executemany", "Model.objects.raw",
+                                     "connection.execute", "engine.execute",
+                                     "session.execute", "orm.execute", "db.execute"):
                         taint_hits.append(0)
-                    elif sink_name in ("render", "HttpResponse", "mark_safe", "render_template"):
+                    elif sink_name in ("render", "HttpResponse", "mark_safe", "render_template",
+                                       "render_template_string", "render_to_string",
+                                       "format_html", "autoescape_off", "SafeString",
+                                       "make_response", "Response"):
                         taint_hits.append(1)
-                    elif sink_name in ("open", "send_file"):
+                    elif sink_name in ("open", "send_file", "send_from_directory"):
                         taint_hits.append(2)
-                    elif sink_name in ("redirect", "HttpResponseRedirect", "RedirectResponse"):
+                    elif sink_name in ("redirect", "HttpResponseRedirect",
+                                       "HttpResponsePermanentRedirect", "RedirectResponse"):
                         taint_hits.append(3)
-                    elif sink_name in ("os.system", "subprocess.run", "subprocess.Popen", "eval", "exec", "popen"):
+                    elif sink_name in ("os.system", "subprocess.run", "subprocess.Popen",
+                                       "eval", "exec", "popen", "os.popen",
+                                       "__import__", "compile", "pickle.loads",
+                                       "pickle.load", "yaml.load", "yaml.unsafe_load",
+                                       "marshal.loads", "subprocess.call"):
                         taint_hits.append(4)
 
     if not seq:
@@ -270,12 +392,20 @@ def predict_meta(src, full_desc=None):
     if taint_hits:
         return Counter(taint_hits).most_common(1)[0][0], 0.90
 
-    # Level 2: Meta-learner (with text features from FULL description)
+    # Level 2: Meta-learner ensemble (average predictions)
     context = full_desc or src
     feats = extract_meta_features(seq, source_code=context)
-    proba = meta_lr.predict_proba(feats.reshape(1, -1))[0]
-    pred = int(meta_lr.predict(feats.reshape(1, -1))[0])
-    conf = float(proba[pred])
+    if len(meta_models) > 1:
+        all_probas = []
+        for mm in meta_models:
+            all_probas.append(mm.predict_proba(feats.reshape(1, -1))[0])
+        avg_proba = np.mean(all_probas, axis=0)
+        pred = int(np.argmax(avg_proba))
+        conf = float(avg_proba[pred])
+    else:
+        proba = meta_models[0].predict_proba(feats.reshape(1, -1))[0]
+        pred = int(meta_models[0].predict(feats.reshape(1, -1))[0])
+        conf = float(proba[pred])
     token_set = set(seq)
 
     # Level 3: Confusion correction rules
