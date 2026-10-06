@@ -1,101 +1,120 @@
 # Contributing to SYRTH
 
-Thanks for your interest in SYRTH! This guide covers the development setup and
-how the project is organised. SYRTH is pre-1.0, so the layout and CLI are still
-stabilising — open an issue before large changes.
+## Before you start
 
-## Development Setup
+Read [`docs/risk-model.md`](risk-model.md). It is the contract: SYRTH
+reports the nearest vulnerability class with a likelihood and its evidence. It
+does not decide whether code is safe. Most review comments on this project are
+about that distinction.
+
+## Setup
 
 ```bash
-# Clone
-git clone https://github.com/Zierax/Syrth.git
-cd Syrth
-
-# venv
-python -m venv ~/syrth-venv
-source ~/syrth-venv/bin/activate        # Windows: syrth-venv\Scripts\activate
-pip install torch numpy scikit-learn joblib
-
-# Train a model so scans work
-python harvester.py
-python _build_5class.py 3000 _full_dataset_5class.json
-python repair_dataset.py --top-k 30000
-python train_final_only.py
+pip install -e ".[dev,benchmark]"
+python -m pytest tests -q -o addopts=
+python -m ruff check syrth tests benchmarks
 ```
 
-## Project Structure
+Required before every hand-off:
 
-```
-syrth/
-├── docs/                 # Documentation (this folder)
-├── RLTESTS/              # Real-code end-to-end tests (6 files + runner)
-├── collect.py            # AST token extraction + taint engine
-├── syrth_scan.py         # Scanning CLI (per-function, taint-confirmed)
-├── harvester.py          # OSV PyPI bulk feed + synthetic samples
-├── _build_5class.py      # Balanced 5-class dataset builder
-├── repair_dataset.py     # Leak-free re-tokeniser / train-test split
-├── train_model.py        # SyrthEncoder model definition + C export
-├── train_final_only.py   # Training entrypoint used by the pipeline
-├── eval_heldout.py       # Held-out advisory-text accuracy
-├── check_agree.py        # Dev/prod (C engine) agreement check
-├── _eval_code.py         # Real scanned-code benchmark
-├── benchmark.py          # Latency/memory benchmark
-└── README.md
+```bash
+python -m pytest tests -q -o addopts=      # expect: 627 passed, 1 skipped
+python -m ruff check syrth tests benchmarks # expect: All checks passed!
 ```
 
-There is **no** `tests/` or `examples/` directory yet — regression coverage
-lives in `RLTESTS/` and the accuracy scripts. Add `pytest` suites when you add
-features.
+The skip is the C-export test, which needs a C compiler. On a machine without one
+it is legitimately skipped — say so rather than reporting a clean run.
 
-## Vulnerability Classes (5)
+Do not claim a command passed unless you ran it and read the output.
 
-`SQLi (0)`, `XSS (1)`, `PathTraversal (2)`, `OpenRedirect (3)`, `RCE (4)`.
-Class order is fixed in `train_model.py` (`cwe_names`) and the exported C
-header — do not reorder.
+## Where things live
 
-## How Detection Works
+| Path | Role |
+|---|---|
+| `syrth/registry.py` | **the security model** — sinks, sources, sanitisers, CWEs. A leaf |
+| `syrth/parser/` | parsing, propagation, guard recognition |
+| `syrth/taint/engine.py` | taint algebra and merge semantics |
+| `syrth/scan.py` | scanner and CLI |
+| `syrth/patch.py` | patch backends and verification |
+| `benchmarks/` | the harness |
+| `tests/` | 628 tests |
 
-1. `collect.py` parses each function with `ast`, emits structural tokens
-   (`def:`, `arg:`, `sink:`) and tracks data flow from untrusted sources to
-   sinks. A confirmed source→sink edge produces a `tainted:<sink>` token.
-2. The model (`SyrthEncoder`) mean-pools the token embeddings and predicts a
-   class — **but it does not see taint structure well** (mean-pool ignores
-   order). So `syrth_scan.py` applies the real filter: a function is **CONFIRMED**
-   only if it carries a `tainted:<sink>` token.
-3. Safe sink usage (parameterised queries, escaped output, fixed commands)
-   produces no `tainted:` token and is reported as review-only.
+## House rules
 
-## Areas for Contribution
+**The registry is the only place a sink may be declared.** If you find yourself
+deciding whether a call is dangerous anywhere else, that is the bug.
 
-- **Raise RCE / PathTraversal recall** on scanned code (currently the weakest
-  classes; most confusion is with SQLi on fragments).
-- **More taint sources**: ORM query builders, template engines, framework
-  request objects beyond `request.GET/POST/args`.
-- **A sequence-aware model** that exploits `flow:` token ordering (the current
-  mean-pool model intentionally ignores it for C-export simplicity).
-- **CI helper** emitting SARIF from `syrth_scan.py` JSON output.
-- **`pytest` suite** for `collect.py` taint logic and `syrth_scan.py` gating.
+**A change needs a test that fails without it.** Verify by reverting the fix and
+watch the test go red. A test that passes either way is not a regression test.
 
-## Commit / PR Guidelines
+**Never evaluate, exec, or unpickle analysed code.** The analyser reads untrusted
+source. If you add code that runs it, that is a security regression.
 
-- Keep the label (`cwe:`) **out** of model features — it is the ground truth,
-  not a signal. `repair_dataset.py` enforces this; do not bypass it.
-- After training changes, run the full validation set:
-  ```bash
-  python eval_heldout.py      # expect ~94% text accuracy
-  python _eval_code.py        # expect ~69% on scanned code
-  python check_agree.py       # expect 100% dev/prod agreement
-  python RLTESTS/run_tests.py # expect 6/6
-  ```
-- Update `docs/CHANGELOG.md` and the relevant doc page with any behaviour
-  change.
-- Use clear commit titles; the repo convention is imperative ("add ...",
-  "fix ...", "docs: ...").
+**Do not suppress.** `--threshold` marks a finding; it never removes one. The
+only things that hide output are a suppression file and an inline ignore
+comment, both of which are deliberate human decisions. A change that reintroduces
+silent filtering is a change to the product's contract and needs discussion.
 
-## Release Process
+**Explain the why.** This codebase documents non-obvious safety decisions in prose
+— why confidence is ordered a certain way, why a guard is evidence and not proof,
+why a patch declines SQL. Match that. A comment that restates the code is noise.
 
-1. Bump the version in `syrth_scan.py` / `train_model.py` and
-   `docs/CHANGELOG.md`.
-2. Confirm all four validation commands above pass.
-3. Tag: `git tag -a vX.Y.Z -m "..."` (do not push tags without maintainer
-   confirmation).
+## Adding things
+
+**A sink:** add to `syrth/registry.py` with its dangerous argument positions. Add
+a test asserting a flow is reported *and* that a safe argument shape is not.
+
+**A guard shape:** add to `syrth/parser/guards.py`. If the shape constrains only
+a component of a value (`parsed.netloc`), do **not** add it — see
+[`docs/limitations.md`](limitations.md).
+
+**A feature:** add to `features/extractor.py` and bump `FEATURE_SCHEMA_VERSION`.
+Old model bundles will then be refused rather than silently misread.
+
+**A serialisation field:** bump the relevant schema version.
+
+## Testing style
+
+Tests group a behaviour area in a class. Name the invariant, not the function.
+
+```python
+class TestReportPolicy:
+    def test_a_low_likelihood_flow_is_still_reported(self):
+        report = SyrthScanner(threshold=0.95).scan_source(VULNERABLE, "app.py")
+        assert report.findings
+        assert report.findings[0].below_threshold is True
+```
+
+When you change reporting semantics, some existing assertions encode the old
+semantics and will fail. Decide deliberately whether each one is now wrong
+(update it) or still right (fix the code) — do not mechanically rewrite failures
+to green.
+
+## Honesty requirements
+
+- No accuracy claim without a reproducible measurement. The tool currently makes
+  none.
+- When you cite a number, say what produced it and over what data.
+- If a metric measures the harness rather than the analyser, say so. Two such
+  cases were found and documented in [`docs/benchmark.md`](benchmark.md).
+- Prefer `[VERIFIED]` / `[UNVERIFIED]` over confident prose when uncertain.
+
+## Pull requests
+
+1. Tests pass, lint clean.
+2. New behaviour has a test that fails without it.
+3. `docs/` updated if you changed a documented behaviour.
+4. `docs/CHANGELOG.md` gains an entry.
+5. `Context/STATE/known_issues.md` updated if you fixed or found something.
+
+## Known gaps worth attacking
+
+`[`docs/limitations.md`](limitations.md)` lists them. The highest-value
+ones:
+
+- **Rename invariance is 99.2%, not 100%.** Four records change their reported
+  class set under renaming. The project's core claim is that this does not happen.
+- **CWE-79 misses 6 of 26** in the measured set. Not yet investigated per case.
+- **26.7% of confirmed flows survive a recognised sanitiser**, so a correct patch
+  can still be reported as vulnerable.
+- **No CI.** Nothing runs automatically; a regression can land silently.

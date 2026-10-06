@@ -1,5 +1,25 @@
 # Examples and Use Cases
 
+> ## ⚠ Withdrawn: this document describes the retired v1 pipeline
+>
+> The figures, dependency lists, API signatures and target tables below refer to
+> the v1 implementation, which has been replaced. They are retained for
+> provenance and **must not be used as current documentation or quoted as
+> results**. The full audit explaining why — including a claim-by-claim table —
+> is in [`paper/WITHDRAWN.md`](../../paper/WITHDRAWN.md).
+>
+> Current documentation:
+>
+> * [`README.md`](../README.md) — what the tool does and claims today
+> * [`architecture.md`](../architecture.md) — the current design and why
+> * [`docs/CHANGELOG.md`](../CHANGELOG.md) — what changed, with the withdrawal recorded
+>
+> The current public API is `syrth.SyrthScanner`, `syrth.scan:main` and
+> `syrth.patch`; it takes no PyTorch dependency. Install with
+> `pip install -e .` (two dependencies) or `pip install -e ".[ml]"` to add the
+> optional learned ranker.
+
+
 All examples assume the model is trained (`syrth_model.joblib` exists) using
 the pipeline in `INDEX.md`. There are **5** vulnerability classes: `SQLi`, `XSS`,
 `PathTraversal`, `OpenRedirect`, `RCE`.
@@ -159,8 +179,21 @@ expected vulnerability (currently **6/6**).
 
 ## Remaining Gaps
 
-- Real-code accuracy is **86.8%** (719 CVE blocks, code-only features). Held-out
-  on disjoint advisory records is **70.8%** (some advisory snippets lack
-  complete taint paths).
-- PathTraversal is the weakest real-code class (80%) and is occasionally
-  confused with SQLi on fragments.
+- **All accuracy figures previously quoted for this pipeline are withdrawn** —
+  the 86.8% real-code figure and the 70.8% held-out figure among them. See
+  [`paper/WITHDRAWN.md`](../../paper/WITHDRAWN.md). No replacement measurement has
+  been completed; see the measurement protocol in
+  [`architecture.md`](../architecture.md) for how one will be produced.
+- Taint propagation is intraprocedural and flow-insensitive within a function, so
+  both branches of a conditional are analysed. A guard clause is therefore
+  reported as a *partial* mitigation rather than a kill, and reachability is
+  over-approximated.
+- No path, field or alias sensitivity: a value assigned to an attribute
+  propagates to every read of that attribute.
+- Class-qualified names are not tracked, so same-named methods in different
+  classes are merged.
+- The deterministic patch backend declines SQL, because converting a statement to
+  a parameterised query cannot be done soundly without deriving placeholders from
+  the original literal.
+- Cross-language libraries are modelled by name; a library that re-executes a
+  string internally is not visible.

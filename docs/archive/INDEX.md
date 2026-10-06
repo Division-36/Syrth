@@ -1,5 +1,25 @@
 # SYRTH Documentation Index
 
+> ## ⚠ Withdrawn: this document describes the retired v1 pipeline
+>
+> The figures, dependency lists, API signatures and target tables below refer to
+> the v1 implementation, which has been replaced. They are retained for
+> provenance and **must not be used as current documentation or quoted as
+> results**. The full audit explaining why — including a claim-by-claim table —
+> is in [`paper/WITHDRAWN.md`](../../paper/WITHDRAWN.md).
+>
+> Current documentation:
+>
+> * [`README.md`](../README.md) — what the tool does and claims today
+> * [`architecture.md`](../architecture.md) — the current design and why
+> * [`docs/CHANGELOG.md`](../CHANGELOG.md) — what changed, with the withdrawal recorded
+>
+> The current public API is `syrth.SyrthScanner`, `syrth.scan:main` and
+> `syrth.patch`; it takes no PyTorch dependency. Install with
+> `pip install -e .` (two dependencies) or `pip install -e ".[ml]"` to add the
+> optional learned ranker.
+
+
 SYRTH (**S**can **Y**our **R**isk **T**race **H**istory) is an AST-based
 static scanner that detects taint-style vulnerabilities in Python source by
 classifying whether untrusted input reaches a dangerous sink.
@@ -65,11 +85,11 @@ low on real code.
 ### Two Engines
 - **Python engine** (`syrth_scan.py --mode dev`) — easy to debug.
 - **C engine** (`syrth_engine.h`, compiled to `.so`) — identical results,
-  faster; `check_agree.py` verifies 100% agreement.
+  faster; the agreement claim was **withdrawn** (see `paper/WITHDRAWN.md`).
 
 ### Honest Evaluation
-- Held-out (code-only, no description text): **70.8%** (277 records, leak-free).
-- Real scanned CVE code: **86.8%** (719 blocks, via `_eval_code.py`).
+- Held-out accuracy: **withdrawn** — the split was not grouped and the figure could not be reproduced from the committed artefacts.
+- Real scanned CVE code: **withdrawn** — that corpus is ~59% training records.
 - End-to-end real code: **6/6** (`RLTESTS/run_tests.py`).
 
 ## Performance Benchmarks

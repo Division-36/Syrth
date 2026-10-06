@@ -1,5 +1,25 @@
 # Installation Guide
 
+> ## ⚠ Withdrawn: this document describes the retired v1 pipeline
+>
+> The figures, dependency lists, API signatures and target tables below refer to
+> the v1 implementation, which has been replaced. They are retained for
+> provenance and **must not be used as current documentation or quoted as
+> results**. The full audit explaining why — including a claim-by-claim table —
+> is in [`paper/WITHDRAWN.md`](../../paper/WITHDRAWN.md).
+>
+> Current documentation:
+>
+> * [`README.md`](../README.md) — what the tool does and claims today
+> * [`architecture.md`](../architecture.md) — the current design and why
+> * [`docs/CHANGELOG.md`](../CHANGELOG.md) — what changed, with the withdrawal recorded
+>
+> The current public API is `syrth.SyrthScanner`, `syrth.scan:main` and
+> `syrth.patch`; it takes no PyTorch dependency. Install with
+> `pip install -e .` (two dependencies) or `pip install -e ".[ml]"` to add the
+> optional learned ranker.
+
+
 ## System Requirements
 
 ### Minimum Requirements
