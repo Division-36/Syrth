@@ -1,0 +1,105 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "syrth"
+version = "3.0.0"
+description = "Alpha-renaming-invariant, fix-verifying static analysis for Python"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "SYRTH Project" }]
+keywords = [
+    "security",
+    "vulnerability",
+    "static-analysis",
+    "taint-analysis",
+    "sarif",
+    "CWE",
+    "supply-chain",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+# Runtime dependencies are exactly what the default (rules-only) scanner needs.
+# The ML classifier, the model trainer and the C export are optional extras, so a
+# rules-only install stays small and has no heavyweight dependency.
+dependencies = [
+    "tree-sitter>=0.23,<0.27",
+    "tree-sitter-python>=0.23",
+]
+
+[project.optional-dependencies]
+ml = [
+    "xgboost>=2.0",
+    "scikit-learn>=1.3",
+    "numpy>=1.24",
+    "joblib>=1.3",
+]
+explain = [
+    "shap>=0.45",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+]
+benchmark = [
+    "xgboost>=2.0",
+    "scikit-learn>=1.3",
+    "numpy>=1.24",
+    "joblib>=1.3",
+]
+all = [
+    "xgboost>=2.0",
+    "scikit-learn>=1.3",
+    "numpy>=1.24",
+    "joblib>=1.3",
+    "shap>=0.45",
+]
+
+[project.scripts]
+syrth = "syrth.scan:main"
+
+[project.urls]
+Homepage = "https://github.com/Division-36/Syrth"
+Repository = "https://github.com/Division-36/Syrth"
+Issues = "https://github.com/Division-36/Syrth/issues"
+
+[tool.setuptools.packages.find]
+include = ["syrth*"]
+
+[tool.setuptools.package-data]
+syrth = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    # The rule classifier and the scan report intentionally use long lines for
+    # aligned evidence tables.
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --tb=short --durations=10"
+filterwarnings = ["error::DeprecationWarning:syrth.*"]
