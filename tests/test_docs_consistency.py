@@ -164,3 +164,55 @@ def test_json_is_valid():
         path = ROOT / "data" / name
         if path.exists():
             json.loads(path.read_text(encoding="utf-8"))
+
+
+class TestPublishedMeasurementsMatchTheDocs:
+    """A published measurement must not contradict the documentation beside it.
+
+    ``data/risk_benchmark.json`` was stale when it was first added: it held 0.905
+    category coverage and a 0.855 kill rate from before the guard-as-evidence
+    change, while ``docs/benchmark.md`` said 0.957 and 0.89. Nothing caught it,
+    because nothing read the file.
+
+    These assertions are deliberately narrow -- coverage and kill rate, the two
+    figures the docs quote in prose -- so that regenerating a measurement after an
+    unrelated code change does not fail the suite, but a measurement that is
+    *wrong* does.
+    """
+
+    @staticmethod
+    def _load(name: str) -> dict:
+        import json
+
+        path = ROOT / "data" / name
+        assert path.exists(), f"{path} is documented as published but is missing"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_risk_benchmark_is_not_stale(self):
+        report = self._load("risk_benchmark.json")
+        assert report["category_coverage"] == pytest.approx(111 / 116, abs=0.001), (
+            "data/risk_benchmark.json disagrees with docs/benchmark.md; regenerate "
+            "it with benchmarks/risk_metrics.py --json before quoting either"
+        )
+        assert report["kill_rate"] == pytest.approx(89 / 100, abs=0.001)
+
+    def test_competitor_benchmark_covers_the_whole_corpus(self):
+        report = self._load("competitor_benchmark.json")
+        assert report["records"] == 350
+        assert report["pairs"] == 175
+        assert set(report["tools"]) == {
+            "syrth", "bandit", "semgrep", "semgrep-owasp",
+        }
+
+    def test_every_published_tool_reports_its_own_population(self):
+        # A mitigation rate without its denominator reads as a perfect score when
+        # the tool never fired, which is the bug assert_pairs_are_distinct exists
+        # to prevent. The denominator has to be in the published file, and the two
+        # columns have to partition it.
+        report = self._load("competitor_benchmark.json")
+        for name, tool in report["tools"].items():
+            assert "measurable_pairs" in tool, f"{name} published without a population"
+            assert (
+                tool["fix_noticed"] + tool["still_flagged_after_fix"]
+                == tool["measurable_pairs"]
+            ), f"{name}: the mitigation columns do not partition its population"

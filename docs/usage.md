@@ -18,7 +18,7 @@ Verify:
 
 ```bash
 python -c "import syrth; print(syrth.__version__)"
-python -m pytest tests -q -o addopts=      # 627 passed, 1 skipped
+python -m pytest tests -q -o addopts=      # 630 passed, 1 skipped
 python -m ruff check syrth tests benchmarks
 ```
 
