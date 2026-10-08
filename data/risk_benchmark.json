@@ -1,0 +1,62 @@
+{
+  "records": 350,
+  "tier_coverage": {
+    "module-proximity": {
+      "expected": 21,
+      "covered": 18,
+      "records": 216
+    },
+    "direct-sink": {
+      "expected": 95,
+      "covered": 93,
+      "records": 134
+    }
+  },
+  "category_coverage": 0.9568965517241379,
+  "rank_discordance": 0.0,
+  "rename_invariance": 1.0,
+  "kill_rate": 0.89,
+  "determinism": 1.0,
+  "by_cwe": {
+    "CWE-22": {
+      "expected": 44,
+      "covered": 41
+    },
+    "CWE-502": {
+      "expected": 15,
+      "covered": 15
+    },
+    "CWE-79": {
+      "expected": 12,
+      "covered": 10
+    },
+    "CWE-89": {
+      "expected": 4,
+      "covered": 4
+    },
+    "CWE-601": {
+      "expected": 17,
+      "covered": 17
+    },
+    "CWE-94": {
+      "expected": 20,
+      "covered": 20
+    },
+    "CWE-918": {
+      "expected": 4,
+      "covered": 4
+    }
+  },
+  "support": {
+    "records": 350,
+    "records_with_expected": 100,
+    "expected_classes": 116,
+    "covered_classes": 111,
+    "rank_pairs": 22,
+    "rename_checked": 350,
+    "patch_attempts": 100
+  },
+  "warnings": [
+    "4.3% of the vulnerability classes present in the source were not named"
+  ]
+}

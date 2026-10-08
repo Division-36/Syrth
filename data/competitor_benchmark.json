@@ -1,0 +1,115 @@
+{
+  "corpus": "data\\corpus.jsonl",
+  "records": 350,
+  "pairs": 175,
+  "ground_truth": "benchmarks.risk_metrics.expected_classes",
+  "tools": {
+    "syrth": {
+      "available": true,
+      "error": "",
+      "covered": 111,
+      "expected": 116,
+      "percent": 95.69,
+      "unmapped_findings": 0,
+      "seconds": 5.105,
+      "fix_noticed": 8,
+      "still_flagged_after_fix": 66,
+      "measurable_pairs": 74,
+      "fix_noticed_percent": 10.81,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-502",
+        "CWE-601",
+        "CWE-79",
+        "CWE-89",
+        "CWE-918",
+        "CWE-94"
+      ],
+      "per_class": {
+        "CWE-22": "41/44",
+        "CWE-502": "15/15",
+        "CWE-601": "17/17",
+        "CWE-79": "10/12",
+        "CWE-89": "4/4",
+        "CWE-918": "4/4",
+        "CWE-94": "20/20"
+      }
+    },
+    "bandit": {
+      "available": true,
+      "error": "",
+      "covered": 23,
+      "expected": 116,
+      "percent": 19.83,
+      "unmapped_findings": 0,
+      "seconds": 12.22,
+      "fix_noticed": 8,
+      "still_flagged_after_fix": 52,
+      "measurable_pairs": 60,
+      "fix_noticed_percent": 13.33,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-502",
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "1/44",
+        "CWE-502": "14/15",
+        "CWE-601": "0/17",
+        "CWE-79": "8/12",
+        "CWE-89": "0/4",
+        "CWE-918": "0/4",
+        "CWE-94": "0/20"
+      }
+    },
+    "semgrep": {
+      "available": true,
+      "error": "",
+      "covered": 17,
+      "expected": 116,
+      "percent": 14.66,
+      "unmapped_findings": 0,
+      "seconds": 23.447,
+      "fix_noticed": 11,
+      "still_flagged_after_fix": 14,
+      "measurable_pairs": 25,
+      "fix_noticed_percent": 44.0,
+      "classes_modelled": [
+        "CWE-502",
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "0/44",
+        "CWE-502": "11/15",
+        "CWE-601": "0/17",
+        "CWE-79": "6/12",
+        "CWE-89": "0/4",
+        "CWE-918": "0/4",
+        "CWE-94": "0/20"
+      }
+    },
+    "semgrep-owasp": {
+      "available": true,
+      "error": "",
+      "covered": 0,
+      "expected": 116,
+      "percent": 0.0,
+      "unmapped_findings": 0,
+      "seconds": 35.954,
+      "fix_noticed": 1,
+      "still_flagged_after_fix": 2,
+      "measurable_pairs": 3,
+      "fix_noticed_percent": 33.33,
+      "classes_modelled": [],
+      "per_class": {
+        "CWE-22": "0/44",
+        "CWE-502": "0/15",
+        "CWE-601": "0/17",
+        "CWE-79": "0/12",
+        "CWE-89": "0/4",
+        "CWE-918": "0/4",
+        "CWE-94": "0/20"
+      }
+    }
+  }
+}
