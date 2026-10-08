@@ -1,4 +1,13 @@
-torch>=2.0.0
+# Optional dependencies for the ranker, the trainer and the C export.
+#
+# The rules-only scanner needs neither these nor torch: pyproject.toml declares
+# tree-sitter and tree-sitter-python as the runtime dependencies, and a
+# rules-only install has no heavyweight dependency at all. Install with
+# `pip install -e ".[benchmark]"` rather than from this file.
+#
+# torch is gone with the retired v1 pipeline. This file used to list it, which
+# contradicted the README and made a plain install pull a ~2 GB wheel.
 numpy>=1.24.0
 scikit-learn>=1.3.0
 joblib>=1.3.0
+xgboost>=2.0.0

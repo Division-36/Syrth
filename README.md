@@ -1,240 +1,128 @@
-# SYRTH: Scan Your Risk Trace History
+# SYRTH
 
-## Overview
+**Static analysis for Python that reports the nearest vulnerability class to your
+code, with the evidence and a likelihood — and verifies its own patches.**
 
-SYRTH is an AST-based vulnerability pattern classifier for Python source code. It parses code into security-relevant function traces, encodes them into token sequences, and classifies them into 5 CWE vulnerability categories using a trained neural network. The scanner includes built-in explainability: per-function breakdown, token importance, and pattern analysis.
+Syrth parses Python and reports every point where your code touches a dangerous
+operation: which vulnerability class is nearest, how likely it is, and why. It is a
+**risk surface mapper, not a verdict machine.** It does not decide whether code is
+safe.
 
----
+```console
+$ syrth --path src/
+========================================================================
+SYRTH - Scan Your Risk Trace History
+target : (repository)
+model  : rule
+scanned: 412 file(s), 3180 function(s), 37 trace(s)
+cross-function flows resolved: 6
+========================================================================
 
-## Vulnerability Classes
+[CRITICAL] CWE-94 (EXEC) confidence 0.89
+  src/handlers/admin.py:31 in rebuild_cache()
+  sink: subprocess.run -> EXEC_COMMAND via pos:0
+  origin: REQUEST
+  >> L28     call     request.GET.get
+     L30     arg      request.GET.get('path')
+     L31     sink     subprocess.run
+------------------------------------------------------------------------
+[LOW] CWE-79 (XSS) confidence 0.40
+  src/views/comment.py:12 in render_comment()
+  sink: HttpResponse -> XSS_RESPONSE_BODY via none
+  origin: none (sanitiser assertion)
+  reaches a XSS sink but no external origin was confirmed
+------------------------------------------------------------------------
+```
 
-| Class | CWE ID | Name | Example Pattern |
-|-------|--------|------|-----------------|
-| 0 | CWE-89 | SQLi | `arg:input` → `sink:execute` |
-| 1 | CWE-79 | XSS | `arg:input` → `sink:render` |
-| 2 | CWE-22 | PathTraversal | `arg:filename` → `sink:open` |
-| 3 | CWE-601 | OpenRedirect | `arg:url` → `sink:redirect` |
-| 4 | CWE-94 | RCE | `arg:cmd` → `sink:eval` / `sink:os.system` |
+Two different kinds of statement. The first is a confirmed flow: untrusted input
+reaches a command execution sink. The second is a sink contact with no confirmed
+flow — the nearest vulnerability class to that function, reported at low
+likelihood rather than omitted. **Everything is reported.** Silence is not an
+answer.
 
-**Dropped classes** (not detectable from AST traces): IDOR (CWE-284), SSRF (CWE-918), BrokenAuth (CWE-287). These are logic flaws requiring authorization context that static AST analysis cannot reliably detect.
+## What it answers, and what it does not
 
----
+> **What is the nearest vulnerability class to this code, and how likely is it?**
 
-## Installation
+It does not answer *is this code vulnerable?* It is not a classifier and produces no
+accuracy score. A finding is never deleted to improve a number: `--threshold` marks
+a finding so a consumer can filter it, and the only things that suppress output are
+an explicit suppression file and an inline ignore — decisions you make. The full
+contract is in [docs/risk-model.md](docs/risk-model.md), which is the document to
+read before quoting any figure from this project.
+
+## Install and run
 
 ```bash
-# Clone
-git clone https://github.com/Division-36/Syrth.git
-cd Syrth
+pip install -e .                 # two dependencies: tree-sitter only
+pip install -e ".[dev,benchmark]"
 
-# Install dependencies
-pip install torch numpy scikit-learn joblib
+syrth --file app.py
+syrth --path src/ --json
+syrth --file app.py --fix        # propose and verify patches
 ```
 
-### Requirements
+Python 3.10+. No PyTorch, no model server, no network.
 
-- Python 3.8+
-- GCC (required for `--mode fast` only)
+## Documentation
 
----
-
-## Usage
-
-### Quick Start
-
-```bash
-# Scan a Python file
-python syrth_scan.py --file views.py --mode dev
-
-# JSON output with explainability
-python syrth_scan.py --file views.py --mode dev --json
-
-# Fast mode (C engine)
-python syrth_scan.py --file views.py --mode fast
-```
-
-### Explainability Output
-
-The scanner shows **why** it classified a vulnerability:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  SYRTH: Scan Your Risk Trace History
-  Source : views.py
-  Mode   : DEV
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  ► PathTraversal: 67%  [CWE-22]
-    Path Traversal (CWE-22) — user input used in filesystem path
-
-  Pattern Analysis:
-    Moderate confidence classification as PathTraversal
-    Function 'upload_file' (line 4) contains dangerous sink(s): os.path.join, open
-      -> No authentication guard present
-
-  Function Breakdown:
-    🔴 upload_file (line 4): sinks=[os.path.join, open] ✗ no auth
-       → Dangerous sinks: os.path.join, open
-       → User input sources: request
-    🟡 secure_view (line 12): sinks=[render] ✓ auth
-       → Has authentication decorator
-
-  Key Tokens:
-    sink:open                           ████████████████████ (sink)
-    call:os.path.join                   ████████████████████ (call)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-### Pipeline
-
-```
-Python Source File
-       │
-       ▼
- collect.py  ──── AST parsing, sink detection, token extraction
-       │
-       ▼
-  Token Sequence  (def:name, arg:input, sink:execute, @decorator)
-       │
-       ▼
- syrth_scan.py ── Inference via PyTorch (dev) or C engine (fast)
-       │
-       ▼
-  Classification + Explainability
-```
-
----
-
-## Training
-
-### Dataset Generation
-
-```bash
-# Build synthetic code-derived dataset (recommended)
-python _build_synthetic.py
-
-# Or build from harvester templates
-python harvester.py
-```
-
-### Model Training
-
-```bash
-python train_model.py --dataset _balanced_dataset.json
-```
-
-Produces:
-- `syrth_model.joblib` — Python model bundle
-- `syrth_engine.h` — Self-contained C header for fast mode
-
-### Results
-
-SYRTH is validated on **real GitHub advisory data** (OSV PyPI bulk corpus, 2,299
-records, 5 CWE classes), with a strict leak-free train/test split (0 overlapping
-records, no label leakage).
-
-**Trained and tested on real advisories** (`repair_dataset.py` → `train_model.py`):
-
-The train/test split is keyed on the stable advisory identity (`ghsa_id`) and
-stratified per class, so the benchmark is reproducible and leak-free (0
-overlapping records, label excluded from features).
-
-| Metric | Value |
+| I want to | Read |
 |---|---|
-| Held-out test accuracy (code-only features) | **70.8%** (277 records, leak-free, no description text) |
-| SQLi | 62.5% |
-| XSS | 56.2% |
-| PathTraversal | 59.6% |
-| OpenRedirect | 96.3% |
-| RCE | 78.8% |
-| Leakage | 0 records |
-| Dev/Fast agreement | 100% |
-| Training data | **16,940 real PyPI advisories** (OSV bulk feed, all packages) + 554 synthetic code templates; code-only mode keeps 3,584 records with parseable code tokens |
+| know what the tool actually claims | [docs/risk-model.md](docs/risk-model.md) |
+| see the measurements | [docs/benchmark.md](docs/benchmark.md) |
+| know what it cannot do | [docs/limitations.md](docs/limitations.md) |
+| understand the pipeline | [docs/architecture.md](docs/architecture.md) |
+| find every open problem | [Context/STATE/known_issues.md](Context/STATE/known_issues.md) |
 
-**Real scanned code** (719 real CVE code blocks run through the actual
-`syrth_scan` pipeline): **86.8%** overall — SQLi 67%, XSS 80%, PathTraversal
-80%, OpenRedirect 100%, RCE 93%. This is the honest code-scanning number:
-features are exactly what `syrth_scan.py` emits at inference (no description
-text, no severity, no framework markers).
+## Measured behaviour
 
-**Taint-confirmed, function-level scanning.** `syrth_scan.py` classifies each
-function independently and only raises a **CONFIRMED** finding when untrusted
-input actually reaches a dangerous sink (a `tainted:<sink>` token exists). Safe
-sink usage — parameterised queries, escaped output, fixed commands — produces
-no taint token and is reported as safe / review-only, which eliminates the
-false positives that plagued the old file-level classifier. Taint propagates
-through string concatenation and f-strings, so the common
-`HttpResponse("..." + user_input)` / `f"..{x}.."` injection patterns are
-caught.
+On the built corpus (350 records, 175 vulnerable/patched pairs, 24 repositories),
+against an **independent AST scan** that shares no code with the analyser:
 
-**Code-only validation** (real code samples in `RLTESTS/`): **6/6 PASS**,
-dev/fast C-engine agreement **100%**.
+| Measurement | Result |
+|---|---|
+| category coverage | **95.7%** (111/116) |
+| rank agreement | **100%** (22/22) |
+| rename invariance | **100%** (350/350) |
+| patch kill rate | **89.0%** (89/100) |
+| determinism | **100%** (350/350) |
 
-> ⚠ **Honesty note:** An earlier 99% figure was invalid — it came from a
-> train/test split that reused identical records *and* leaked the label
-> (`cwe:` token) into the features. Both issues are fixed. Training is now
-> **code-only** (no `txt:`, `txt2:`, `severity:`, or `framework:` tokens)
-> so the model cannot shortcut on advisory text. The headline hold-out
-> number is **70.8%** on disjoint advisory records; the real-code number
-> (**86.8%**) uses the same `to_token_sequence` code path the scanner emits
-> and is the honest production metric.
+Against the same corpus and the same ground truth:
 
-The real-advisory model uses advisory description text (`txt:` features) as
-honest, non-label signal. For pure source-code scanning (no description
-available), use the default code-only training via `train_final_only.py`
-and validate via `RLTESTS/`.
+| Tool | Coverage | Fix noticed | Still flagged |
+|---|---|---|---|
+| **syrth** | **111/116 (95.7%)** | 8/74 | 66/74 |
+| bandit 1.9.4 | 23/116 (19.8%) | 8/60 | 52/60 |
+| semgrep 1.179.0 (`p/security-audit`) | 17/116 (14.7%) | 11/25 | 14/25 |
 
----
+Two caveats stated plainly. The coverage gap is mostly **rule coverage**: Bandit
+ships no open-redirect rule, so its `0/17` on CWE-601 means "does not model this
+class", and where both tools have a rule Bandit wins one — `14/15` on CWE-502
+against SYRTH's `15/15`. And the last two columns are the interesting ones: **every
+tool misses most of the fixes it can see.** Read them with their denominators;
+`semgrep`'s `11/25` is over 25 pairs it can detect.
 
-## Architecture
+This is not a precision or recall measurement. The corpus has no reliable negative
+class, and each pair's patched side still contains its sink call by design.
+
+## Repository layout
 
 ```
-SyrthEncoder
-├── Embedding(vocab_size, 256, padding_idx=0)
-├── Mean Pool (masked)
-├── Dropout(0.2)
-└── MLP Head
-    ├── Linear(256 → 1024) + ReLU + Dropout(0.2)
-    ├── Linear(1024 → 512)  + ReLU + Dropout(0.2)
-    └── Linear(512 → 5)
+syrth/        the analyser: parser, taint, registry, guards, reporting
+benchmarks/   the measurement surface and the corpus comparison harness
+tools/        the corpus builder
+tests/        631 tests
+docs/         the contract, the measurements, and their limits
+legacy/       the retired v1 scripts, kept so the withdrawal can be checked
+experiments/  v1 pipeline scripts; their numbers are withdrawn
+paper/        WITHDRAWN.md -- which v1 results were withdrawn, and why
+Context/      project state, decisions, and open issues
+RLTESTS/      smoke-test fixtures: deliberately vulnerable modules
 ```
 
-Bag-of-Words is intentional: Transformers underperform on small, structured token sequences. Mean-pooled embeddings over security-semantic tokens generalise better.
+`syrth_scan.py` is a compatibility shim that forwards to the current CLI and prints
+a notice that the old PyTorch inference path is retired.
 
----
+## Licence
 
-## File Structure
-
-```
-Syrth/
-├── harvester.py          # Dataset builder + synthetic variant generator
-├── collect.py            # AST trace extractor
-├── train_model.py        # Model training + C header export
-├── syrth_scan.py         # Inference frontend (dev + fast + explainability)
-├── _build_synthetic.py   # Code-derived dataset builder (recommended)
-├── benchmark.py          # Performance evaluator
-├── requirements.txt      # Python dependencies
-├── Makefile              # Build commands
-├── syrth_model.joblib    # Trained model bundle (generated)
-├── syrth_engine.h        # C header (generated)
-└── syrth_engine.so       # Shared library (auto-generated on first fast run)
-```
-
----
-
-## Design Decisions
-
-### Why 5 classes, not 8?
-IDOR, SSRF, and BrokenAuth are logic flaws requiring authorization context. Static AST analysis of function signatures and call patterns cannot reliably detect them. Training on undetectable classes hurts accuracy on detectable ones.
-
-### Synthetic Code-Derived Training
-The model trains on real Python vulnerable/patched pairs processed through the same AST pipeline used at scan time. This ensures training tokens match inference tokens exactly.
-
-### Explainability via Embedding Analysis
-Token importance is computed by projecting embeddings through the MLP layers and measuring alignment with the predicted class weights. This shows which tokens most influenced the classification.
-
----
-
-## License
-
-MIT
+MIT.
