@@ -111,7 +111,7 @@ class, and each pair's patched side still contains its sink call by design.
 syrth/        the analyser: parser, taint, registry, guards, reporting
 benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
-tests/        631 tests
+tests/        625 tests
 docs/         the contract, the measurements, and their limits
 legacy/       the retired v1 scripts, kept so the withdrawal can be checked
 experiments/  v1 pipeline scripts; their numbers are withdrawn

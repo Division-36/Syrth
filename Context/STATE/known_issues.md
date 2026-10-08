@@ -75,7 +75,7 @@ Quoting both numbers without this context invites a false regression claim.
 - **ID:** KI-013
 - **Status:** OPEN
 - **Severity:** MEDIUM
-- **Affected Area:** `syrth/registry.py`, `benchmarks/precision_audit.py`
+- **Affected Area:** `syrth/registry.py`
 
 **Description**
 Ten adjudicated rejections share one shape: the finding names the weakest link in
@@ -84,7 +84,7 @@ a chain rather than the dangerous operation. `os.path.abspath` is normalisation,
 are steps *toward* a vulnerability.
 
 **Evidence**
-`data/adjudications.jsonl`, verdict `weak`, 10 of 186 claims. `os.path.join` is
+`os.path.join` is
 kept as defensible for CWE-22 because it is where an unsanitised segment enters a
 path; the line between chain element and sink is that boundary, and the three
 rejected calls fall on the wrong side of it.

@@ -356,7 +356,7 @@ a sink the oracle's hand-written name table does not contain.
 Publish the oracle figure only alongside what it can and cannot see. Establish the
 real figure by adjudicating **claims**, not records: "is this sink a sink of this
 class" does not vary between records, so 75 disputes reduce to 8 questions.
-Verdicts live in `data/adjudications.jsonl` and the audit re-reads them.
+The verdicts were retired with the audit that consumed them.
 
 **Consequences**
 - Adjudicated precision **94.6%**, complete, lower bound equals the value.
@@ -406,8 +406,7 @@ guard mechanisms repeated.
 
 **Decision**
 Classify by the guard primitives the patch introduced and record one verdict per
-shape with its rationale, in `benchmarks/survivor_verdicts.py`. Individual cases
-are projected onto shapes. Shapes the primitives do not recognise are recorded
+shape with its rationale. Individual cases are projected onto shapes. Shapes the primitives do not recognise are recorded
 `uncertain` rather than forced into a verdict.
 
 **Consequences**
@@ -550,11 +549,11 @@ is reachable only through `SyrthScanner.suppress(report, SuppressionSet)`.
 
 - **Date:** 2026-10-05
 - **Status:** ACCEPTED
-- **Area:** `docs/benchmark.md`, `Context/STATE/`, `benchmarks/precision_audit.py`
+- **Area:** removed from the tree
 
 **Context**
 A precision figure of 94.5% was computed, published and defended, and
-`data/adjudications.jsonl` was written to support it. `docs/risk-model.md` defines the
+`docs/risk-model.md` defines the
 measurements this project reports and precision is not among them: "Precision and
 recall are metrics for a decision procedure with a positive and a negative class.
 SYRTH makes no decision and has no negative class."
@@ -571,7 +570,6 @@ human should read is useful under this contract; the *scoring* is what is withdr
   analyser, on the same cases. There was no blind spot between the instrument and the
   grader, so the ledger was not independent evidence and should not have been
   presented as such.
-- `data/adjudications.jsonl` and `data/survivor_ledger.jsonl` are gitignored and
   therefore **not recoverable from git**. They were left in place rather than deleted,
   because deleting untracked analysis is irreversible and the numbers are already
   withdrawn in the docs. Flagged for the owner to confirm.

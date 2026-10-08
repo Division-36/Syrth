@@ -16,7 +16,7 @@ for.
 
 | Check | Result |
 |---|---|
-| `python -m pytest tests -q -o addopts=` | **630 passed, 1 skipped** (skip = no C compiler) |
+| `python -m pytest tests -q -o addopts=` | **624 passed, 1 skipped** (skip = no C compiler) |
 | `python -m ruff check syrth tests benchmarks tools` | **All checks passed** |
 | `python -m benchmarks.risk_metrics --dataset data/corpus.jsonl` | coverage **95.7%** (111/116), kill **89.0%** (89/100), rank agreement **100%**, invariance **100%**, determinism **100%** |
 | `python -m benchmarks.competitors --dataset data/corpus.jsonl` | coverage: syrth **95.7%** (111/116), bandit **19.8%** (23/116), semgrep `p/security-audit` **14.7%** (17/116), semgrep `p/owasp-top-ten` **0%** (0/116). Fix noticed: syrth 8/74, bandit 8/60, semgrep 11/25, owasp 1/3 |
@@ -73,8 +73,6 @@ The first precision figure published for this project was wrong in the most
 damaging way: 59.7%, computed against a name-list oracle coarser than the
 analyser, where all 75 disagreements were sinks the oracle could not see
 (`os.path.join`, `Markup`, `FileResponse`). Adjudicating them by hand gives
-**94.6%**, complete, with nothing left unadjudicated. Verdicts are data in
-`data/adjudications.jsonl`, not prose, so the figure is reproducible.
 
 The ten remaining rejections are all the same defect: reporting the weakest link
 of a chain (`os.path.abspath`, `jinja2.Environment`, `__import__`) as if it were
