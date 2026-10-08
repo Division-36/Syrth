@@ -82,6 +82,19 @@ syrth_engine.h
 syrth_engine.so
 models/
 
+# --- paper/ ---
+# The paper is the withdrawn artefact, so it is not tracked: main.tex,
+# references.bib and the 367 KB main.pdf describe the methodology whose figures
+# paper/WITHDRAWN.md withdraws. Keeping it would put the claim and its retraction
+# side by side with nothing to say which one holds.
+#
+# paper/WITHDRAWN.md IS tracked, and it is deliberately not covered by the pattern
+# below. It is not the paper; it is the claim-by-claim audit of what the paper got
+# wrong, and roughly twenty-five documents link to it. WITHDRAWN.md alone would be
+# a retraction with no claim attached, which withdraws nothing.
+paper/*
+!paper/WITHDRAWN.md
+
 # --- v1 corpora ---
 # The retired pipeline's datasets were versioned here once, at about 44 MB, and
 # are regenerated rather than tracked: they are inputs to a model whose numbers
