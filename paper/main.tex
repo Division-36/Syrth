@@ -1,0 +1,578 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{natbib}
+\usepackage{abstract}
+
+\geometry{margin=2.5cm}
+
+\newcommand{\journal}[1]{}
+
+\begin{document}
+
+\title{SYRTH: AST-Based Taint-Confirmed Vulnerability Detection in Python Source Code Using Neural Ensemble Classification}
+
+\author{Author One\thanks{Organization} \and Author Two\thanks{Organization}}
+
+\maketitle
+
+% ============================================================================
+% WITHDRAWAL NOTICE
+% ----------------------------------------------------------------------------
+% Every quantitative result in this manuscript has been withdrawn. The pipeline
+% that produced them had three defects that made the numbers unreproducible from
+% the code and data in this repository:
+%
+%   1. The meta-learner stage never executed. It read a bundle key that does not
+%      exist and passed a 20-element feature vector to a model expecting 53; both
+%      failures were swallowed by a bare `except Exception: pass`. The
+%      repository's own ablation table shows "Full System" and "Ensemble Only"
+%      with identical accuracy, precision, recall, F1, per-class accuracy and
+%      confusion matrix -- they differ only in wall-clock time.
+%   2. The meta-learner's final step was a hard-coded swap against a hard-coded
+%      RCE class index, not a learned decision.
+%   3. The meta-learner was trained with the ground-truth CWE description text
+%      injected as a feature, and evaluated with the advisory description passed
+%      in at inference time.
+%
+% Additionally, the train/test split was a random shuffle rather than a grouped
+% split, ensemble weights were set to held-out accuracy, and the token extractor
+% seeded taint from a regex on identifier *names*, so verdicts depended on how a
+% developer had chosen to name a variable.
+%
+% The full audit trail, including a claim-by-claim table, is in
+% `paper/WITHDRAWN.md`. The abstract and contributions below have been rewritten
+% to describe the corrected system, which makes claims about *what it does* and
+% none about how often it is right relative to any other tool. No replacement
+% accuracy figure is asserted, because none has been measured yet.
+%
+% Sections 2 (Related Work), and the discussion of why static analysis fails,
+% remain accurate. Section 4 retains the table shapes but not the values.
+% ============================================================================
+
+\begin{abstract}
+Static analysis of source code for security vulnerabilities remains a critical yet challenging task in software engineering. Existing approaches either rely on handcrafted rules with high false-positive rates or employ learned models over identifier-bearing source text, which conflate what a developer \emph{called} something with what the code \emph{does}. We present \textbf{SYRTH} (Scan Your Risk Trace History), a Python static analyser whose primary output is not a class label but a \textbf{trace certificate}: a source-to-sink path, with the propagation steps and the sink argument it reached, that a reviewer can check line by line. Three properties follow from that choice. First, \textbf{rename invariance}: taint is seeded from parameter \emph{position} and dataflow role rather than from identifier spelling, so two programs differing only by a consistent alpha-renaming produce identical verdicts, and the feature vector contains no identifier-derived field. Second, \textbf{typed kills}: sanitisers neutralise the sink categories they actually protect (\texttt{shlex.quote} kills command injection and nothing else; \texttt{os.path.normpath} is a \emph{partial} mitigation for path traversal), and sinks carry argument schemas so that a parameterised query is not a finding. Third, \textbf{mechanical patch verification}: a proposed fix is accepted only when the targeted flow is provably gone, no new flow has appeared, and the file still parses --- so a patch that trades one injection for another is rejected rather than recorded as a fix. Because trace identity is computed from flow structure with line numbers excluded, the same mechanism compares two revisions and reports which flows a change introduced, killed, or left in place. We claim these properties and describe the mechanisms that enforce them. We do not claim an accuracy figure: earlier results from a previous pipeline are withdrawn in \S\ref{sec:withdrawal}, with the reasons, and no replacement measurement on a leak-free corpus has yet been completed.
+\end{abstract}
+
+\keywords{Static Analysis, Vulnerability Detection, Taint Analysis, Abstract Syntax Tree, Alpha-Renaming Invariance, Patch Verification, SARIF}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:introduction}
+
+Software vulnerabilities continue to pose significant security risks, with the Common Weakness Enumeration (CWE) database documenting thousands of distinct vulnerability types~\cite{cwe}. Static analysis tools detect vulnerabilities without executing the target program, making them essential for early-stage security assessment~\cite{sadowski2018lessons, distefano2019scaling}. However, traditional rule-based static analyzers suffer from high false-positive rates~\cite{pereira2021machine}, while learned approaches over source text suffer from a different failure: their verdicts depend on identifier spelling, so a purely cosmetic refactor can change a finding.
+
+Recent work has explored combining program analysis with machine learning for vulnerability detection. Li et al.~\cite{li2018vuldeepecker} introduced code gadgets as program representations for deep learning-based detection. Zhou et al.~\cite{zhou2019devign} applied graph neural networks to integrated code property graphs. More recently, LLM-based approaches such as IRIS~\cite{li2024iris} and MoCQ~\cite{mocq2025} have demonstrated the potential of neuro-symbolic methods that combine large language models with static analysis.
+
+Despite these advances, several challenges remain: (1) most file-level and function-level classifiers cannot verify data-flow paths, so they cannot distinguish a sink used safely from one used unsafely; (2) findings are reported as points, so a reviewer cannot tell whether a later patch removed the flow, moved it, or replaced it with a different one; (3) whether a proposed fix actually worked is left to manual review.
+
+We address these challenges with \textbf{SYRTH} (Scan Your Risk Trace History), a Python static analyser with three contributions:
+
+\begin{enumerate}
+    \item \textbf{Trace certificates as the primary output.} SYRTH emits, for each finding, the source, the ordered propagation steps, and the sink argument reached, as a serialisable object with a structural identity. A confidence number accompanies the finding but never decides whether it exists.
+
+    \item \textbf{Rename invariance as a designed property.} Taint is seeded from parameter position and from dataflow role; identifier spelling never enters the verdict, and the feature vector contains no identifier-derived field. Sanitisers are modelled as category-typed kills and sinks carry argument schemas, so safe and unsafe sink usage are distinguishable. \S\ref{sec:rename} states the property precisely and \S\ref{sec:measure} describes how it is measured rather than asserted.
+
+    \item \textbf{Mechanical patch verification.} A proposed fix is accepted only when the targeted flow is gone, no new flow has appeared anywhere in the file, and the file still parses. Because trace identity excludes line numbers, the same mechanism compares two revisions and reports which flows a change introduced, killed, or left in place, and it runs as a CI check.
+\end{enumerate}
+
+We make claims about these mechanisms and describe how each is enforced and tested. We do not report an accuracy comparison. The results of an earlier pipeline are withdrawn, with the reasons given in \S\ref{sec:withdrawal}, and no replacement measurement on a leak-free corpus has been completed.
+
+\section{Withdrawal of Earlier Results}
+\label{sec:withdrawal}
+
+An earlier version of this system reported 70.8\% held-out accuracy, 86.8\% on real code blocks, 100\% agreement between two inference engines, and statistically significant improvements over component baselines. \textbf{All four are withdrawn.} The audit is recorded in full in the repository at \texttt{paper/WITHDRAWN.md}; the three defects that invalidate them are:
+
+\begin{enumerate}
+    \item The meta-learner stage never executed. It read a bundle key that the trained artefacts do not contain, and passed a 20-element feature vector to a model fitted on 53; both errors were caught by a bare \texttt{except Exception: pass}. Consequently the reported ``full system'' was the ensemble alone, which is visible in the project's own ablation table, where the full-system and ensemble-only rows are identical in every metric.
+    \item The meta-learner's final step was a probability swap against a hard-coded RCE class index rather than a learned decision.
+    \item The meta-learner was trained with the ground-truth CWE description text injected as a training feature, and evaluated with the advisory description supplied at inference time.
+\end{enumerate}
+
+Compounding these: the reported train/test split was a random shuffle rather than a grouped split, so identical and near-identical records appeared on both sides; ensemble weights were set to held-out accuracy, so the held-out set was not held out; and the token extractor seeded taint from a regular expression matched against identifier \emph{names}, so ``\texttt{def f(name)}'' and ``\texttt{def f(user\_id)}'' produced different verdicts for identical code.
+
+We report this rather than quietly superseding it because the failure mode is instructive for the field: an ablation table whose rows are accidentally identical is detectable in minutes by anyone who opens the file, and it survived here only because the numbers were plausible. We regard that as an argument for publishing negative results alongside positive ones, and for having the evaluation harness print its own invariants (label ties, split leaks, abstention rate) rather than relying on a reader to check them.
+
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Deep Learning for Vulnerability Detection}
+
+The application of deep learning to vulnerability detection has grown significantly since 2018. Li et al.~\cite{li2018vuldeepecker} introduced VulDeePecker, the first deep learning-based vulnerability detection system, using bidirectional LSTMs on code gadgets derived from data dependencies. This work demonstrated that deep learning could detect vulnerabilities missed by traditional tools like Flawfinder and RATS. The same group extended this to multiclass detection with $\mu$VulDeePecker~\cite{zou2019muVulDeePecker}, introducing code attention mechanisms to capture vulnerability-type-specific information across 40 CWE types.
+
+Zhou et al.~\cite{zhou2019devign} pioneered the use of graph neural networks (GNNs) for vulnerability detection with Devign, which models programs as integrated code property graphs combining AST, control flow, and data flow. This established a foundational benchmark that subsequent works have built upon. Farmer et al.~\cite{farmer2026vulgnn} demonstrated that lightweight GNNs (1.1M parameters) can achieve performance comparable to much larger models, making them practical for CI/CD integration.
+
+\subsection{AST-Based Analysis}
+
+Abstract Syntax Trees provide a natural representation for code analysis. Tian et al.~\cite{tian2023trvd} proposed AST decomposition with attention-augmented recursive neural networks, achieving superior performance on multiple vulnerability datasets. Zhang et al.~\cite{zhang2026exastrvd} extended ASTs with eight additional edge types capturing dynamic control flows, using graph attention networks for global embedding. The Proximal Instance Aggregator~\cite{proximal2022} applied deep multiple instance learning to AST paths, providing inherent explainability through instance-level granularity.
+
+\subsection{Taint Analysis and Static Analysis}
+
+Taint analysis tracks the flow of untrusted data through programs, a fundamental technique for detecting injection vulnerabilities. Recent work has focused on automating taint specification extraction. SemTaint~\cite{semtaint2026} uses multi-agent LLM systems to extract taint specifications for JavaScript, detecting vulnerabilities across dependency boundaries. Zipper~\cite{zipper2025} achieves high precision (68.34\%) and recall (98.14\%) for PHP applications using on-demand taint analysis with object sensitivity. LATTE~\cite{latte2025} demonstrates the first LLM-powered static binary taint analysis, finding 37 new bugs in real-world firmware.
+
+Industry deployment of static analysis has been documented by Sadowski et al.~\cite{sadowski2018lessons} at Google and Distefano et al.~\cite{distefano2019scaling} at Facebook, highlighting challenges of false positives, developer experience, and scalability. These lessons inform our design of SYRTH's taint-confirmed gating mechanism.
+
+\subsection{Code Representation Learning}
+
+Pre-trained models for code have shown strong performance on various tasks. CodeBERT~\cite{feng2020codebert} introduced bimodal pre-training for programming languages. GraphCodeBERT~\cite{guo2021graphcodebert} incorporated data flow graphs into representation learning. More recently, CLeVeR~\cite{clever2025} applied contrastive learning to vulnerability code representations, achieving 72.82\% F1 on real-world data. Vul-CGBT~\cite{vulcgbt2026} combined contrastive semantic learning with graph embeddings, showing F1 improvements of 3--50\% across multiple benchmarks.
+
+\subsection{Ensemble Methods for Software Defects}
+
+Ensemble methods have demonstrated consistent improvements in software defect prediction. Isong and Igo~\cite{isong2025ensemble} analyzed 56 studies showing that boosting outperforms individual classifiers by 12--18\% in recall/F1. Mehta~\cite{mehta2026adaptive} proposed meta-ensemble architectures with adaptive sampling for imbalanced defect data. A comprehensive study on ensemble learning for software defect prediction~\cite{ensemble2026} showed that SLSQP-optimized ensembles achieve 94.6\% accuracy across 28 datasets.
+
+\subsection{Neuro-Symbolic Approaches}
+
+The combination of neural and symbolic methods represents a promising direction. IRIS~\cite{li2024iris} integrates LLMs with CodeQL for whole-repository vulnerability reasoning, detecting 55 vulnerabilities compared to CodeQL's 27. MoCQ~\cite{mocq2025} generates vulnerability detection queries using LLMs and validates them through symbolic reasoning, identifying seven previously unknown vulnerabilities. These approaches motivate our combination of neural classification with rule-based and taint-based components.
+
+\section{Methodology}
+\label{sec:methodology}
+
+\paragraph{Scope of this section.}
+\textbf{The subsections below describe the retired v1 pipeline and are retained for
+historical comparison only.} They are not a description of the implementation
+described in \S\ref{sec:measure}. The current system differs from the one
+documented here in every stage: node spans are decoded from the encoded bytes
+rather than sliced from the decoded string; taint is seeded from parameter
+position rather than from identifier names; sanitisers and sink argument schemas
+are modelled explicitly; and the learned classifier is an optional CPU-only
+ranker that refines the probability of an already-confirmed flow rather than the
+stage that decides what is reported. Where the two differ in a way that changes a
+conclusion, the difference is noted inline.
+
+\medskip
+
+SYRTH operates as a four-stage pipeline: AST trace extraction, token encoding, neural classification, and taint-confirmed gating.
+
+\subsection{AST Trace Extraction}
+\label{sec:trace}
+
+The \texttt{TraceVisitor} in \texttt{collect.py} performs a depth-first traversal of the Python AST, extracting security-relevant information from each function:
+
+\begin{itemize}
+    \item \textbf{Function metadata:} Name, decorators (annotated with \texttt{@decorator}), arguments
+    \item \textbf{Call patterns:} Method calls and function invocations (annotated with \texttt{call:name})
+    \item \textbf{Sink detection:} Calls to dangerous APIs (annotated with \texttt{sink:name})
+    \item \textbf{Import analysis:} Module imports for contextual signals
+\end{itemize}
+
+The SINK\_REGISTRY contains 70+ dangerous API patterns across SQL execution, OS/subprocess, code execution, template rendering, file system, network, redirect, and deserialization categories.
+
+\subsection{Taint Analysis}
+\label{sec:taint}
+
+SYRTH implements forward taint propagation at the function level. A token is marked as tainted when it originates from an untrusted source (function arguments, request objects, environment variables) and flows toward a dangerous sink. The taint propagation rules handle:
+
+\begin{itemize}
+    \item \textbf{String concatenation:} \texttt{BinOp} with \texttt{+} operator propagates taint from either operand
+    \item \textbf{F-strings:} \texttt{JoinedStr} nodes propagate taint from format values
+    \item \textbf{Method calls:} Calls on tainted objects produce tainted results
+    \item \textbf{Subscript access:} Dict/list access on tainted objects preserves taint
+    \item \textbf{Loop iteration:} For-loop variables inherit taint from iterables
+\end{itemize}
+
+When untrusted input reaches a dangerous sink, the v1 analyser emitted a \texttt{tainted:<sink>} token, and the intended mechanism for reducing false positives was that safe sink usage would not produce one. \textbf{That mechanism was not implemented.} The v1 analysis applied every argument of every sink call identically, so safe and unsafe usage were indistinguishable; \texttt{cursor.execute(sql, params)} appeared safe only because tuple-valued arguments were not handled at all, and \texttt{authenticate(username=..., password=...)} produced a confirmed finding. The corrected analyser replaces the heuristic with two explicit mechanisms: a per-sink argument schema, under which a parameterised query routes its second argument through a structural kill, and category-typed sanitisers, under which \texttt{shlex.quote} neutralises command injection but not SQL injection.
+
+\subsection{Token Encoding}
+\label{sec:token}
+
+The token vocabulary captures security-relevant structural information:
+
+\begin{table}[h]
+\centering
+\caption{Token vocabulary categories}
+\label{tab:tokens}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Token Pattern & Example & Meaning \\
+\midrule
+\texttt{def:name} & \texttt{def:login} & Function name \\
+\texttt{arg:name} & \texttt{arg:username} & Function parameter \\
+\texttt{call:name} & \texttt{call:execute} & Method invocation \\
+\texttt{sink:name} & \texttt{sink:execute} & Dangerous API call \\
+\texttt{flow:name} & \texttt{flow:username} & Data flow edge \\
+\texttt{tainted:name} & \texttt{tainted:execute} & Taint reaches sink \\
+\texttt{@decorator} & \texttt{@login\_required} & Security decorator \\
+\texttt{SCAT:category} & \texttt{SCAT:SQL} & Sink category \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Neural Architecture}
+\label{sec:architecture}
+
+SYRTH uses the \texttt{SyrthEncoder}, a lightweight neural classifier:
+
+\begin{equation}
+\text{SyrthEncoder}(x, \text{aux}) = \text{MLP}\left(\text{MeanPool}(\text{Embed}(x)) \| \text{aux}\right)
+\end{equation}
+
+where $\|$ denotes concatenation. The architecture consists of:
+\begin{itemize}
+    \item Embedding layer: $\mathbb{R}^{|V| \times 256}$ with padding index
+    \item Mean pooling over non-padding tokens
+    \item 14-dimensional auxiliary features (sink counts, taint presence, SCAT categories, structural signals)
+    \item 3-layer MLP: $270 \rightarrow 1024 \rightarrow 512 \rightarrow 5$ with ReLU and dropout (0.2)
+\end{itemize}
+
+We intentionally use Bag-of-Words (mean-pooled embeddings) rather than Transformers, as Transformers underperform on small, structured token sequences where positional information is less informative than semantic token identity.
+
+\subsection{Ensemble and Meta-Learning}
+\label{sec:ensemble}
+
+The ensemble trains $K=5$ models with diverse hyperparameters:
+\begin{itemize}
+    \item Different random seeds for initialization diversity
+    \item Embedding dimensions: $\{192, 224, 256\}$
+    \item FFN dimensions: $\{768, 1024\}$
+    \item Dropout rates: $\{0.2, 0.3\}$
+\end{itemize}
+
+The final prediction combines:
+\begin{equation}
+p_{\text{ensemble}}(y=k) = \frac{1}{K} \sum_{i=1}^{K} w_i \cdot p_i(y=k)
+\end{equation}
+
+A logistic regression meta-learner was then intended to combine:
+\begin{itemize}
+    \item Ensemble class probabilities (5 values)
+    \item Rule-based classifier predictions (\texttt{\_rules.py})
+    \item Taint presence features
+    \item Class one-hot encoding
+\end{itemize}
+\textbf{This stage did not execute in any reported run}, for the reasons given in
+\S\ref{sec:withdrawal}: it read a bundle key the artefacts do not contain, and it
+was handed a 20-element feature vector by a model fitted on 53. Both errors were
+swallowed. In the corrected system there is no meta-learner; the learned
+component is an optional CPU-only gradient-boosted ranker that may only refine
+the probability of a flow the analysis has already confirmed.
+
+\subsection{Taint-Confirmed Gating}
+\label{sec:gating}
+
+The intended gating rule was that a function is reported as \textbf{CONFIRMED}
+vulnerable only when the ensemble predicts a class above a confidence floor, a
+\texttt{tainted:<sink>} token is present, and the predicted class matches the
+taint sink category. As noted above, the second and third conditions were
+unreliable: taint did not propagate through f-strings, \texttt{.format()} or
+keyword arguments, and the class-matching step was implemented as a hard-coded
+probability swap against a literal RCE index rather than a comparison.
+
+The corrected system inverts the dependency. \emph{Existence} of a flow is decided
+by the analysis alone, from parameter-position-seeded taint, an explicit per-sink
+argument schema, and category-typed sanitisers. The learned component contributes
+only a probability and a prior, and can neither create nor delete a finding; a
+model that is absent, unfitted, or raising at prediction time leaves the output
+bit-identical. This is why the corrected pipeline can report a result with no
+model installed at all.
+
+This gating mechanism eliminates false positives from:
+\begin{itemize}
+    \item Safe parameterized queries (no taint reaches \texttt{sink:execute})
+    \item Escaped HTML output (no taint reaches \texttt{sink:render})
+    \item Fixed file paths (no taint reaches \texttt{sink:open})
+\end{itemize}
+
+\section{Implementation}
+\label{sec:implementation}
+
+SYRTH is implemented in Python 3.8+ with the following components:
+
+\begin{itemize}
+    \item \texttt{collect.py}: AST trace extractor (783 lines)
+    \item \texttt{train\_model.py}: Model definition and training (702 lines)
+    \item \texttt{syrth\_scan.py}: Inference frontend with explainability (953 lines)
+    \item \texttt{\_rules.py}: Rule-based classifier (202 lines)
+    \item \texttt{harvester.py}: Dataset builder with 82 synthetic templates
+    \item \texttt{repair\_dataset.py}: Leak-free data splitting
+\end{itemize}
+
+\subsection{Dual-Engine Architecture}
+
+The trained model is exported in two formats:
+
+\begin{enumerate}
+    \item \textbf{Python engine} (\texttt{syrth\_ensemble.joblib}): PyTorch model bundle with 5 ensemble members, used for development and validation.
+    
+    \item \textbf{C engine} (\texttt{syrth\_engine.h}): Self-contained C header with embedded model weights, binary-search vocabulary lookup, and manual matrix multiplication. Zero external dependencies; compiled with \texttt{gcc -O3 -march=native -flto}.
+\end{enumerate}
+
+The C engine implements:
+\begin{itemize}
+    \item Binary search for token lookup: $O(\log n)$ over $\sim$3,342 vocabulary entries
+    \item Matrix multiplication with ReLU activation for each MLP layer
+    \item Numerically stable softmax with max-subtract trick
+    \item Agreement with the Python engine. \textbf{Withdrawn.} The v1 dev mode read
+    a five-model ensemble while the fast mode read a C header exported from a
+    different, single model, so agreement between the shipped defaults was not
+    measurable; the only recorded run reports 23.4\%.
+\end{itemize}
+
+\section{Rename Invariance}
+\label{sec:rename}
+
+\subsection{Statement}
+
+Let $\alpha$ be a consistent renaming of a program's identifiers that preserves
+module paths, attribute names, keyword-argument names and builtins, so that
+$\alpha(P)$ has the same denotation as $P$. Then for every function $f$ in $P$,
+the analyser produces the same flow set, the same sink arguments, the same taint
+origins and the same category for $\alpha(f)$ as for $f$. Confidence may differ;
+the verdict may not.
+
+\subsection{Why It Is Worth Stating}
+
+Every classifier over source text violates this property, and violates it in a
+way that is invisible in aggregate metrics. A function named
+\texttt{process\_user\_input} is more likely to be judged an injection sink than
+one named \texttt{handle}, for reasons that have nothing to do with either
+program's behaviour. Two consequences follow. A cosmetic refactor changes the
+security report, so teams learn to ignore it. And an attacker or an unlucky
+developer can suppress a finding by renaming a variable.
+
+\subsection{Mechanism}
+
+Three decisions establish the property, and each is necessary.
+
+\begin{enumerate}
+    \item \textbf{Sources are seeded by position and by dataflow role.} Every
+    function parameter is a source regardless of its spelling. External reads
+    (\texttt{input}, \texttt{os.environ}, \texttt{request.GET},
+    \texttt{cursor.fetchall}, \texttt{fh.read}, \texttt{response.text}) are
+    recognised structurally and labelled with the origin they imply. Identifier
+    names influence at most a reported label --- for example, a parameter
+    declared with the conventional framework name \texttt{request} is reported as
+    originating from an HTTP request rather than from an unnamed parameter --- and
+    both labels are external with identical severity, so no verdict can turn on
+    the difference.
+    \item \textbf{Identifier normalisation is auxiliary.} The token stream carries
+    normalised name hints, but they live outside the feature vector and are not
+    consumed by the classifier. The vector's fields are counts, category flags,
+    origin flags, sanitiser-presence flags, propagation-path lengths and
+    complexity measures --- all functions of dataflow shape.
+    \item \textbf{Resolution never depends on spelling order.} Canonical sink
+    resolution iterates a pre-sorted candidate list, so the result cannot vary
+    with the hash seed. The previous implementation iterated a
+    \texttt{frozenset} and broke on the first match, which made the same file
+    produce different tokens in different processes.
+\end{enumerate}
+
+\subsection{Measurement}
+
+Invariance is a construction argument, not an empirical finding, so the harness
+treats it as a falsification check: it applies a sound alpha-renaming to every
+record and reports the share whose verdict is unchanged, with a bootstrap
+interval. The soundness of the renamer is itself a precondition and is tested,
+because a renamer that renamed \texttt{open} or \texttt{import os} would report a
+renaming artefact as an invariance failure --- which is exactly the kind of
+measurement error that produced the results withdrawn in \S\ref{sec:withdrawal}.
+
+\section{Measurement Protocol}
+\label{sec:measure}
+
+Because the previous results are withdrawn (\S\ref{sec:withdrawal}), this section
+specifies how results will be produced rather than reporting numbers that have
+not been produced. The protocol is implemented in
+\texttt{benchmarks/run\_benchmarks.py} and is executed as
+\texttt{make bench}; the properties described in \S\ref{sec:rename} are enforced by
+\texttt{tests/} and checked by that harness.
+
+\subsection{What Is Measured}
+
+\begin{itemize}
+    \item \textbf{Precision and recall, not accuracy.} Any realistic corpus is
+    dominated by safe code, so accuracy is close to uninformative. Precision
+    answers the only question a reviewer has: when SYRTH speaks, how often is it
+    right.
+    \item \textbf{Selective precision and coverage.} Raising the confidence floor
+    must improve precision. The harness reports both precision at a fixed floor
+    and the fraction of unsafe records on which the tool spoke, so a tool that
+    has been tuned to be silent cannot look good.
+    \item \textbf{Abstention rate.} The fraction of safe records on which the
+    analyser declines. Reported alongside every precision figure, because a
+    precision number without its abstention rate does not say whether the tool
+    detects anything.
+    \item \textbf{Rename invariance.} Every record is analysed twice, once under
+    a sound alpha-renaming that preserves module paths, attribute names, keyword
+    argument names and builtins. The reported fraction is the share of records
+    whose verdict is unchanged. The renamer's own soundness is a precondition: a
+    renamer that renamed \texttt{open} or \texttt{import os} would measure itself
+    rather than the analyser.
+    \item \textbf{Patch kill rate.} Each confirmed flow is re-analysed with a
+    categorically correct sanitiser applied to its sink argument. The kill rate is
+    the fraction of flows that disappear. A detector that cannot demonstrate that
+    the mitigation it recommends removes the flow has not closed the loop.
+\end{itemize}
+
+\subsection{Split and Leakage Controls}
+
+Records are split by a stable group identity, so no advisory, file or project can
+straddle the boundary, and the harness asserts group-disjointness rather than
+assuming it. Hyper-parameter selection uses cross-validation on the training
+split alone; the held-out split is scored exactly once. The harness additionally
+counts identical feature vectors carrying conflicting labels, because such pairs
+cap achievable accuracy and a reader deserves to know the ceiling before seeing a
+score.
+
+\subsection{Statistical Reporting}
+
+All rates carry bootstrap confidence intervals, resampled over records as the unit
+of independence. No significance test is claimed without a test. Where a
+comparison is drawn against another tool, that tool is executed on the same corpus
+by the same harness; quoted baseline numbers are not accepted, because they cannot
+be re-verified and, in this project's own history, were not.
+
+\subsection{Current Status}
+
+No results under this protocol are reported in this manuscript. The corrected
+pipeline is complete and its invariants are covered by an automated test suite
+(\texttt{pytest}, 441 tests, completing in well under a minute), but a
+sufficiently large labelled corpus with stable group identifiers has not been
+committed to the repository, and no baseline comparison has been executed. We
+prefer to report nothing to reporting a number that a future maintainer cannot
+reproduce.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Component Contributions}
+
+\textbf{No ablation table is reported.} The v1 ablation is withdrawn in full, and
+not only because the full-system and ensemble-only rows were identical: the
+``no taint'' variant stripped \texttt{tainted:*} tokens while retaining
+\texttt{flow:*} tokens, which carry the same information, so it was a null
+ablation by construction; and the ``taint gate only'' baseline defaulted to
+predicting one class whenever no taint token was present, so its reported score
+measured that default rather than the heuristic. An ablation in which a component
+is removed without changing the information available to the model does not
+measure that component.
+
+What can be said about component contributions is limited to properties that are
+structurally enforced and therefore testable without a corpus:
+
+\begin{enumerate}
+    \item \textbf{Sanitisers determine whether safe code is silent.} This is a
+    property of the kill model, not a statistical claim: the test suite asserts
+    that \texttt{shlex.quote} suppresses command injection and does not suppress
+    SQL injection, that \texttt{cursor.execute(sql, params)} is silent, and that a
+    sanitised operand cannot launder an unsanitised one.
+    \item \textbf{Rename invariance is a structural property of the feature space.}
+    The vector contains no identifier-derived field, so invariance holds by
+    construction; the harness measures it on real records as a check that the
+    construction was not quietly violated.
+    \item \textbf{The learned component is not load-bearing.} Removing the model
+    leaves the finding set bit-identical by design, and the test suite asserts it,
+    including when the model raises at prediction time.
+\end{enumerate}
+
+\subsection{Strengths and Limitations}
+
+\textbf{Strengths:}
+\begin{itemize}
+    \item Findings carry verifiable source-to-sink paths rather than bare labels
+    \item Patches are mechanically verified before being accepted, including the
+    requirement that no new flow appear
+    \item Verdicts are invariant under consistent renaming, by construction and by
+    measurement
+    \item Two-dependency default install; the learned component is optional and
+    its absence changes no finding
+\end{itemize}
+
+\textbf{Limitations:}
+\begin{itemize}
+    \item Limited to Python source code; does not handle JavaScript, Java, or C/C++
+    \item Intraprocedural dataflow is flow-insensitive within a function: both
+    branches of a conditional are analysed and merged, which over-approximates
+    reachability. A guard clause is therefore treated as a partial mitigation
+    rather than a kill.
+    \item No path sensitivity, field sensitivity or alias analysis; a value
+    assigned to an attribute propagates to every read of that attribute
+    \item Class-qualified names are not tracked, so same-named methods in
+    different classes are merged; the report says so rather than guessing
+    \item \textbf{Withdrawn.} The 69.0\% figure and its per-class breakdown are
+    withdrawn (\S\ref{sec:withdrawal}); no accuracy claim is made for the
+    corrected system, which is measured by the protocol in \S\ref{sec:measure}.
+    \item The dataset size quoted in earlier drafts has not been re-established on
+    a grouped, leak-free corpus
+    \item Does not handle obfuscated or dynamically generated code
+    \item Cross-language libraries are modelled by name; a library that re-executes
+    a string internally is not visible to the analysis
+\end{itemize}
+
+\subsection{Threats to Validity}
+
+\begin{itemize}
+    \item \textbf{The rename-invariance metric depends on the renamer being sound.}
+    A renamer that renames builtins, module paths, attribute names or keyword
+    arguments produces a different program and would measure itself rather than
+    the analyser. The harness therefore excludes those categories explicitly, and
+    the exclusions are themselves tested.
+    \item \textbf{Kill rate is measured against the analyser's own kill model.}
+    A sanitiser the model does not recognise counts against it. This is a lower
+    bound on what the mitigation does, and a ceiling on what the model can verify,
+    and the two are not the same quantity.
+    \item \textbf{Dataset bias:} any corpus assembled from advisory metadata carries
+    the ecosystem and disclosure bias of its source.
+    \item \textbf{Label quality:} advisory labels may be wrong, and identical
+    feature vectors with conflicting labels make part of that irreducible. The
+    harness counts such pairs and reports them.
+    \item \textbf{Evaluation metrics:} precision at a fixed confidence floor is not
+    the same as precision under a deployment-specific cost model; the harness
+    reports the selectivity curve's endpoints rather than a single operating
+    point so that the trade-off stays visible.
+\end{itemize}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented SYRTH, a Python static analyser whose output is a verifiable
+source-to-sink path rather than a class label, and whose central design choices
+are rename invariance, category-typed sanitisers with per-sink argument schemas,
+and mechanical verification of proposed patches.
+
+We also presented a withdrawal. The earlier pipeline reported 70.8\%, 86.8\% and
+100\% engine agreement, and \S\ref{sec:withdrawal} documents why none of those
+numbers could be reproduced: a meta-learner stage that never executed behind a
+swallowed exception, a hard-coded class index standing in for a learned decision,
+a label injected into the meta-learner's features, a split that was not grouped,
+and a taint analysis whose verdicts depended on what a developer had named a
+variable. We report no replacement accuracy figure, because none has been
+measured on a corpus that would support one.
+
+That withdrawal is itself a result. The most damaging failure in this project was
+not a bug in the analysis but an ablation table whose full-system and
+ensemble-only rows were byte-identical, which survived because the numbers were
+plausible and nobody had cause to doubt them. The corrected evaluation harness is
+built around that lesson: it prints its own invariants, counts label ties and
+split leaks, reports abstention rate next to every precision figure, attaches
+confidence intervals to every rate, and measures a rename-invariance property
+that a competitor cannot match by construction. An evaluation harness that makes
+its own trustworthiness a measurable quantity is a more durable contribution than
+any single accuracy figure.
+
+Future work: (1) commit a grouped, leak-free corpus and run the protocol of
+\S\ref{sec:measure} on it, with competitor baselines executed rather than quoted;
+(2) extend the kill model with library-specific sanitiser semantics and
+preconditions, since that is the binding constraint on both precision and patch
+verification; (3) add path- and field-sensitivity, which the current
+over-approximation would otherwise make expensive; (4) port the registry and the
+kill model to additional languages, which the language-agnostic parser
+abstraction was designed for; and (5) integrate the revision diff and patch
+verification as CI checks, so that ``did this fix work'' is answered by the build
+rather than by a reviewer.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

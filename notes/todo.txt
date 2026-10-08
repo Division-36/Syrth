@@ -1,0 +1,3 @@
+0-increase the data and training and make the harvester.py better
+1-save this version and try to make a better version 
+2-bro make a git workflow, VScode extention, docker, upload it on google colab
