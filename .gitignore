@@ -1,46 +1,130 @@
-# Python
+# Build artefacts and generated data.
+# None of these belong in version control: they are either reproducible from
+# source, or they are outputs of a run whose inputs are recorded elsewhere.
+
+# --- Python ---
 __pycache__/
 *.py[cod]
+*.so
+*.pyd
+*.dll
+build/
+dist/
 *.egg-info/
-.pytest_cache/
+.eggs/
+.installed.cfg
+pip-wheel-metadata/
+
+# --- Virtual environments ---
 .venv/
 venv/
+env/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
-# SYRTH artifacts (generated, not source)
-syrth_model.joblib
-syrth_engine.so
-syrth_engine.h
+# --- Test and tool binaries ---
+# Compiled from tests/test_c_engine.c; rebuild rather than commit.
+tests/test_c_engine
+tests/test_c_engine.exe
 
-# Generated datasets (rebuilt by harvester.py / repair_dataset.py / _build_balanced.py)
-_dataset.json
-_full_dataset.json
-_full_dataset_5class.json
-_merged_5class.json
+# --- Generated corpora ---
+# Reproduced from the OSV bulk feed by the harvester; tens of megabytes.
+_full_dataset*.json
+_balanced*.json
+_merged_*.json
+_testing_*.json
+testingMassiveDataset.json
 _fresh_synthetic.json
-_advisory_only.json
-_balanced_dataset.json
-_balanced_new.json
-_testing_new.json
+_targeted_synthetic.json
+_curated_blocks.json
+_misclassified_blocks.json
+# --- data/: bulk is ignored, measurements are published ---
+#
+# Two different kinds of file live here and they are treated differently on
+# purpose. The corpora are bulk: multi-megabyte collections of third-party source
+# that tools/build_corpus.py regenerates from the advisories, and which no reader
+# benefits from having in the repository. The measurements are the opposite --
+# a few kilobytes each, and the only way anyone can check a number quoted in
+# docs/benchmark.md.
+#
+# Ignored, regenerated:
+data/*.jsonl
+data/adjudication_queue.json
+data/cve_pairs.jsonl
+data/corpus.jsonl
+data/*.json
+
+# Published, so every figure in the docs is checkable against its source:
+!data/competitor_benchmark.json
+!data/risk_benchmark.json
+!data/corpus_manifest.json
+
+# Deliberately NOT published: data/benchmark.json. It reports precision, recall,
+# f1, false_positive_rate and abstention_rate, which are the measurements of the
+# retired classifier and are withdrawn along with the rest of that section in
+# docs/benchmark.md. It is also stale -- it predates the guard-as-evidence change
+# -- so publishing it would put numbers in the repository that contradict the
+# documentation. docs/risk-model.md defines what this project reports; that file
+# does not.
+
+# --- Model bundles and exported engines ---
+*.joblib
+syrth_model.joblib
+syrth_ensemble*.joblib
+syrth_meta*.joblib
+syrth_engine.h
+syrth_engine.so
+models/
+
+# --- v1 corpora ---
+# The retired pipeline's datasets were versioned here once, at about 44 MB, and
+# are regenerated rather than tracked: they are inputs to a model whose numbers
+# are withdrawn, and paper/WITHDRAWN.md documents why by describing defects in code
+# rather than by pointing at a blob. legacy/v1-artifacts/README.md records this.
+_balanced_dataset*.json
+_full_dataset*.json
+_merged_*.json
+_testing_*.json
 testingMassiveDataset.json
 
-# Benchmark outputs (old 8-class benchmarks, regenerated per-run)
-benchmark/
-tests/
+# --- Learned-model weights ---
+# syrth_codebert/ is 479 MB (a CodeBERT encoder: model.safetensors plus its
+# tokenizer). It is an installable artefact, not source, and the only copy in this
+# tree is the local one -- anyone using it needs to fetch it deliberately rather
+# than inherit it from the clone. Recorded here so the absence is a decision
+# rather than an oversight.
+syrth_codebert/
+*.safetensors
 
-# Scratch helpers (one-off, not part of the pipeline)
-_merge.py
-_audit.py
-__verify_imports.py
-__analyze.py
-__class_dist.py
-check_test.py
-test_dev_fast.py
-test_heldout.py
-test_final.py
-test_vuln.py
-verify_final.py
+# Note: RLTESTS/ is *tracked*, not ignored. Those are the smoke-test fixtures --
+# deliberately vulnerable sample modules used to check that the scanner still
+# fires. They are source for the test suite, so they belong in the repository even
+# though every file in them is insecure on purpose.
 
-# OS / editor
-.DS_Store
+# --- Scratch space used by the external patch backend ---
+.syrth-patch/
+
+# --- Local scratch work ---
+# One-off analysis scripts and the outputs of the retired v1 pipeline. Kept on
+# disk for the audit trail in legacy/README.md, never committed: those outputs
+# visualise figures that paper/WITHDRAWN.md withdraws.
+experiments/scratch/
+
+# --- Editor / OS ---
+.vscode/
+.idea/
 *.swp
 *~
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+__run.log
+__install.log
+*.log
