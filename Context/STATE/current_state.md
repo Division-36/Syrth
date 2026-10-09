@@ -16,7 +16,7 @@ for.
 
 | Check | Result |
 |---|---|
-| `python -m pytest tests -q -o addopts=` | **624 passed, 1 skipped** (skip = no C compiler) |
+| `python -m pytest tests -q -o addopts=` | **626 passed, 1 skipped** (skip = no C compiler) |
 | `python -m ruff check syrth tests benchmarks tools` | **All checks passed** |
 | `python -m benchmarks.risk_metrics --dataset data/corpus.jsonl` | coverage **95.7%** (111/116), kill **89.0%** (89/100), rank agreement **100%**, invariance **100%**, determinism **100%** |
 | `python -m benchmarks.competitors --dataset data/corpus.jsonl` | coverage: syrth **95.7%** (111/116), bandit **19.8%** (23/116), semgrep `p/security-audit` **14.7%** (17/116), semgrep `p/owasp-top-ten` **0%** (0/116). Fix noticed: syrth 8/74, bandit 8/60, semgrep 11/25, owasp 1/3 |
@@ -107,7 +107,7 @@ the dangerous operation. Specific and fixable in the registry.
 `[FACT]` No trained model exists. The `*.joblib` files on disk are v1 artefacts
 and will not load in the current package.
 
-`[FACT]` Package version is still `3.0.0`; the rename to `1.0.0` has not started.
+`[FACT]` Package version is `1.0.0`, set across pyproject.toml and both `__version__` constants.
 
 `[FACT]` Everything described as current exists only as uncommitted files. The
 last commit, `3a38572`, is v1-era.

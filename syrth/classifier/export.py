@@ -417,6 +417,16 @@ def export_c_header(
     out.extend(f"    {value:.17g}," for value in base_score)
     out.append("};\n")
 
+# The tree pointer table references TREE_0..TREE_N, whose definitions follow
+    # below. C99 requires a declaration before use, so emit forward declarations
+    # here and define the arrays afterwards. Without them the generated header does
+    # not compile at all -- the header was tested only on a host with no C compiler,
+    # so this went unnoticed until the export test ran under gcc in CI.
+    out.append("/* Forward declarations: the pointer table below names these arrays,\n"
+               " * and C99 has no implicit declaration. */")
+    for i in range(num_trees):
+        out.append(f"static const SyrthNode TREE_{i}[];")
+
     out.append("static const SyrthNode* SYRTH_TREES[SYRTH_NUM_TREES] = {")
     out.extend(f"    TREE_{i}," for i in range(num_trees))
     out.append("};\n")
@@ -425,6 +435,7 @@ def export_c_header(
     for index, tree in enumerate(trees):
         nodes = _exact_tree_nodes(tree)
         total_nodes += len(nodes)
+        # The forward declaration above used an unsized array; give it its size now.
         out.append(f"static const SyrthNode TREE_{index}[{len(nodes)}] = {{")
         for node in nodes:
             if node["type"] == "leaf":

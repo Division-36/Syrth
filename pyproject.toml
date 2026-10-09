@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "syrth"
-version = "3.0.0"
+version = "1.0.0"
 description = "Alpha-renaming-invariant, fix-verifying static analysis for Python"
 readme = "README.md"
 license = "MIT"

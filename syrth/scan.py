@@ -65,7 +65,7 @@ from .trace import SCHEMA_VERSION, Trace
 #: the same place rather than at some invented middle value.
 CONTAINMENT_GUARD_CONFIDENCE = 0.12
 
-__version__ = "3.0.0"
+__version__ = "1.0.0"
 
 #: Ceiling on a pattern-only risk. Reaching a sink is not evidence of a
 #: vulnerability, so no amount of sink contact may claim a high likelihood.

@@ -306,7 +306,7 @@ class TestCompilation:
 int main(void) {{
     static const float f[{len(features)}] = {{{", ".join(f"{v:.9f}" for v in features)}}};
     float probs[SYRTH_NUM_CLASSES];
-    int cls = syrth_predict(f, {len(features)}, probs == NULL ? NULL : &probs[0]);
+    int cls = syrth_predict(f, {len(features)}, &probs[0]);
     printf("%d", cls);
     return 0;
 }}
@@ -314,11 +314,24 @@ int main(void) {{
             encoding="utf-8",
         )
         binary = workdir / "driver"
-        subprocess.run(
+        # capture_output swallowed the compiler's diagnostics, so a failure here
+        # reported "exit status 1" with nothing about what the C compiler said.
+        # The wrapper below re-raises with both streams attached.
+        compiled = subprocess.run(
             [compiler, "-std=c99", "-O2", str(source), "-o", str(binary), "-lm"],
-            check=True,
             capture_output=True,
+            text=True,
         )
+        if compiled.returncode != 0:
+            raise AssertionError(
+                f"{compiler} failed on the exported header:\n"
+                f"--- command ---\n"
+                f"{compiler} -std=c99 -O2 {source} -o {binary} -lm\n"
+                f"--- stdout ---\n{compiled.stdout}\n"
+                f"--- stderr ---\n{compiled.stderr}\n"
+                f"--- header head ---\n"
+                f"{header.read_text(encoding='utf-8', errors='replace')[:2000]}"
+            )
         result = subprocess.run([str(binary)], check=True, capture_output=True, text=True)
         return int(result.stdout.strip())
 

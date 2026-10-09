@@ -18,7 +18,7 @@ python -m ruff check syrth tests benchmarks
 Required before every hand-off:
 
 ```bash
-python -m pytest tests -q -o addopts=      # expect: 624 passed, 1 skipped
+python -m pytest tests -q -o addopts=      # expect: 626 passed, 1 skipped
 python -m ruff check syrth tests benchmarks # expect: All checks passed!
 ```
 
@@ -37,7 +37,7 @@ Do not claim a command passed unless you ran it and read the output.
 | `syrth/scan.py` | scanner and CLI |
 | `syrth/patch.py` | patch backends and verification |
 | `benchmarks/` | the harness |
-| `tests/` | 625 tests |
+| `tests/` | 627 tests |
 
 ## House rules
 

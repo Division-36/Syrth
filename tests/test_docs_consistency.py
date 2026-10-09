@@ -221,3 +221,50 @@ class TestPublishedMeasurementsMatchTheDocs:
                 tool["fix_noticed"] + tool["still_flagged_after_fix"]
                 == tool["measurable_pairs"]
             ), f"{name}: the mitigation columns do not partition its population"
+
+
+class TestVersionIsSingleSourced:
+    """pyproject and both module constants must agree.
+
+    The package said ``3.0.0`` in three places while the documentation, the
+    changelog and the migration plan all said ``1.0.0``. Nothing compared them, so
+    the contradiction was invisible until the release, which is the worst time.
+
+    A test cannot import ``syrth`` here -- this module runs before the package is
+    importable in some environments -- so the constants are read as text. A rename
+    that misses one of the three now fails rather than shipping.
+    """
+
+    @staticmethod
+    def _declared() -> str:
+        import re
+
+        pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
+        assert match, "pyproject.toml declares no version"
+        return match.group(1)
+
+    @staticmethod
+    def _module_constant(relative: str) -> str:
+        import re
+
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        match = re.search(r'^__version__\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        assert match, f"{relative} declares no __version__"
+        return match.group(1)
+
+    def test_pyproject_and_modules_agree(self):
+        declared = self._declared()
+        for module in ("syrth/__init__.py", "syrth/scan.py"):
+            assert self._module_constant(module) == declared, (
+                f"{module} and pyproject.toml disagree on the version"
+            )
+
+    def test_version_is_a_release_number(self):
+        declared = self._declared()
+        assert declared[0] == "1", (
+            f"expected a 1.x release, found {declared!r}"
+        )
+        assert len(declared.split(".")) == 3, (
+            f"expected major.minor.patch, found {declared!r}"
+        )

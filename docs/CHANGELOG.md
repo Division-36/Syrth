@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 -- 2026-10-08
 
 ### Changed — the product definition
 
@@ -292,3 +292,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [ ] Richer taint sources (ORM builders, template engines)
 - [ ] Optional richer model (sequence-aware) to exploit `flow:` ordering
 - [ ] CI helper that emits SARIF from `syrth_scan.py` JSON output
+
+## 1.0.0 -- 2026-10-08
+
+The first release under the current product definition. Everything before it is
+withdrawn; see [Withdrawn: v1 results](../paper/WITHDRAWN.md).
+
+### The contract
+
+SYRTH reports the nearest vulnerability class to a piece of code, the evidence for
+it, and a likelihood. It does not decide whether code is safe, and **nothing is
+withheld for being unlikely**. `docs/risk-model.md` is the document to read before
+quoting any number from this project.
+
+This retires precision and recall as headline metrics. They describe a classifier,
+and this is not one: there is no decision, so there is no positive and negative
+class to score against.
+
+### Measured
+
+On 350 records and 175 vulnerable/patched pairs drawn from 24 repositories, against
+an independent AST scan that shares no code with the analyser:
+
+| Measurement | Result |
+|---|---|
+| category coverage | 95.7% (111/116) |
+| rank agreement | 100% (22/22) |
+| rename invariance | 100% (350/350) |
+| patch kill rate | 89.0% (89/100) |
+| determinism | 100% (350/350) |
+
+Against Bandit 1.9.4 and Semgrep 1.179.0 on the same corpus: 95.7% against 19.8%
+and 14.7% class coverage. Read the caveat below before quoting the gap.
+
+### Added
+
+- `syrth/containment.py` -- recognises the exiting containment idiom
+  (`os.path.commonpath`, `Path.relative_to`, `dirname` compared in an `if` whose
+  body cannot fall through). A dominating guard lowers a finding's likelihood to
+  0.12 and names the guard line. It never removes the finding.
+- Loop exits are bounded to their loop body: `continue` and `break` exit the loop,
+  not the function, so code after the loop is still reachable.
+- Interprocedural guard propagation, bounded by a subset test over the names a
+  function returns.
+- `tools/build_corpus.py` -- builds pairs from GHSA and OSV, with a registry-derived
+  sink check so a snippet is kept only when the labelled class's sink is called.
+  Checkpointed: an interrupted run resumes.
+- `benchmarks/risk_metrics.py` -- category coverage, rank agreement, rename
+  invariance, kill rate, determinism, and a per-tier split.
+- `benchmarks/competitors.py` -- SYRTH against Bandit and two Semgrep rule sets on
+  the same corpus and ground truth, plus a per-tool count of how many fixes each
+  tool registered.
+- SARIF output; patch proposal and self-verification; cross-function flow
+  resolution.
+
+### Fixed
+
+Findings were being removed from the report. `report.suppressed` is the user's
+decision channel -- an explicit suppression file or an inline ignore -- and the
+analyser was writing to it, which cost 0.9 points of category coverage because
+deleting a guarded sink deletes a class name the report exists to contain. Guards
+are now evidence; the finding stays. Pinned by
+`TestNothingIsSilencedByTheAnalyser`, which asserts the invariant over the whole
+report including at a threshold of 0.99 where every finding falls below the bar.
+
+Also: sanitisers were not applied when their argument carried no taint; a
+namespaced import such as `from django.utils.html import escape` did not bind its
+kill; an assertion about a literal was reported as an amplifier.
+
+### Withdrawn
+
+Every quantitative result from the v1 classifier pipeline, the 94.5% adjudicated
+precision figure, and the harness and ledger that produced it. The v1 scripts were
+deleted rather than archived -- they could not run from any clone, since their
+model bundles and training datasets were never committed. `paper/WITHDRAWN.md`
+cites each defect by commit, so the withdrawal stays checkable without the files.
+
+### Known limits
+
+- A guard whose safety depends on the *value* rather than on the shape of the call
+  is invisible. Several corpus survivors constrain one variable while the sink
+  joins another.
+- Every tool misses most of the fixes it can see. SYRTH still flags 66 of the 74
+  patches it detects.
+- The coverage gap against Bandit is mostly rule coverage rather than detection
+  skill; Bandit ships no open-redirect rule, and where both have one, Bandit wins
+  CWE-502 at 14/15 against 15/15.
