@@ -83,7 +83,7 @@ Generated artifacts, caches and vendored clones are omitted.
 | Path | Status |
 |---|---|
 | `syrth_scan.py` | **Deprecation shim** forwarding to `syrth.scan` |
-| `experiments/v1/` | Archived v1 analysis scripts |
+| `experiments/` | Scratch space and the record of the deleted v1 scripts |
 | `experiments/scratch/` | Untracked local scratch; gitignored |
 | `benchmark.py`, `collect.py`, `harvester.py`, `train_model.py`, `repair_dataset.py`, `eval_heldout.py`, `check_agree.py`, `train_final_only.py` | v1 root scripts, unmaintained |
 | `*.joblib`, `syrth_codebert/`, `syrth_engine.{h,so}` | v1 model/header artefacts on disk, gitignored, **not loadable by v3** |

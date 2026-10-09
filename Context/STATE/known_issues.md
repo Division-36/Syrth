@@ -383,7 +383,7 @@ Each affected file opens with a `> ## ⚠ Withdrawn` banner pointing at
 Banner is prominent at the top of each file.
 
 **Potential Fix**
-Either rewrite for v3 or move the directory to `docs/archive/`.
+Deleted: the v1 scripts could not run from a clone, so they were removed and `paper/WITHDRAWN.md` now cites each by commit.
 
 **Last Verified:** 2026-10-02
 

@@ -119,6 +119,33 @@ behind them.
     `syrth_engine.h` are gitignored and were never committed, so both the default
     dev path and the entire fast path could not be reconstructed from a clone.
 
+### Where each cited defect can be read
+
+The v1 scripts are no longer tracked: their figures are withdrawn and keeping dead
+tooling that looks runnable invites someone to run it. Every claim above is
+nonetheless checkable, because each names a file that git still holds in history.
+
+```console
+$ git show 66ad8a5:legacy/v1-scripts/collect.py    # nondeterministic sink resolution
+$ git show 66ad8a5:syrth_scan.py                   # the missing bundle key
+$ git show 66ad8a5:legacy/v1-scripts/benchmark.py  # the unconditional "significant" phrase
+$ git show 66ad8a5:legacy/v1-scripts/eval_heldout.py   # re-running the 70.8% claim
+$ git show 66ad8a5:legacy/v1-scripts/train_model.py | head -20  # SystemExit on import
+$ git show 66ad8a5:legacy/v1-scripts/repair_dataset.py     # takes no positional args
+```
+
+`66ad8a5` is the commit immediately before the deletion, and each path is verified
+to resolve there. The scripts were at the repository root under the same names one
+commit earlier still.
+
+`syrth_scan.py` survives in the current tree as a 94-line shim that forwards to
+the v3 CLI and prints the retirement notice; the file cited above is its
+predecessor. The model bundles the default path loaded (`syrth_model.joblib`,
+`syrth_ensemble*.joblib`, `syrth_meta*.joblib`) and the training datasets were
+never committed and are not recoverable from any clone, which is the sixth defect
+above and is the reason the published accuracies cannot be re-derived even in
+principle.
+
 ---
 
 ## 4. What replaced it

@@ -1,52 +1,48 @@
 # Legacy — the retired v1 pipeline
 
-Nothing in this directory is maintained, installed, or tested. It is retained as
-audit provenance: `paper/WITHDRAWN.md` explains which published results were
-withdrawn and why, and this directory is where the code that produced them can
-still be read.
+Nothing in this directory is maintained, installed, or tested, and there is no code
+here. It is a record of what the project used to be and why it was replaced.
 
-## Why it is kept
+## Why the code is gone rather than archived
 
-The v1 withdrawal claims specific things — that the meta-learner never executed,
-that the label space leaked the target, that the split was not grouped. Those are
-verifiable claims about specific code. Deleting the code would make them
-unverifiable and would destroy the record of what was replaced.
+`paper/WITHDRAWN.md` withdraws the v1 results claim by claim. Those are verifiable
+claims about specific code: that the meta-learner never executed because it read a
+bundle key that did not exist, that the label space leaked the target, that the
+split was not grouped, that `collect.py` resolved sinks through a `frozenset` and
+so produced different tokens per process.
+
+Keeping the files would have let a reviewer read them. Keeping *runnable* files
+that produce numbers nobody may quote is worse than keeping nothing: the v1 scripts
+could not be run from a clone in the first place, since their model bundles and
+training datasets were never committed, so they were dead code wearing the costume
+of a pipeline. The audit now cites each one by commit, which is checkable and does
+not invite a run:
+
+```console
+$ git show 66ad8a5:legacy/v1-scripts/collect.py    # nondeterministic sink resolution
+$ git show 66ad8a5:syrth_scan.py                   # the missing bundle key
+```
+
+The audit also records what is *not* recoverable. The bundles
+(`syrth_model.joblib`, `syrth_ensemble*.joblib`, `syrth_meta*.joblib`) and the
+training datasets were gitignored from the beginning, so no clone can re-derive the
+published accuracies even in principle. That is one of the defects the withdrawal
+cites, and no amount of archiving would have fixed it.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
-| `v1-scripts/` | the v1 entry-point scripts: harvester, dataset builder, trainer, evaluators |
-| `../experiments/v1/` | v1 analysis scripts that were moved out of the repository root |
-| `../experiments/scratch/` | local scratch, gitignored |
-| `../syrth_scan.py` | a **live** deprecation shim — forwards to `syrth.scan` and is tested |
-
-`syrth_scan.py` is the one exception: it is still runnable and still tested. It
-is not v1 code, it is a compatibility entry point that routes old command lines
-to the current scanner and prints a deprecation notice.
-
-## What v1 was
-
-A five-model ensemble with a stacking meta-learner, fed advisory text including
-the ground-truth CWE description as a feature. It reported accuracy figures that
-could not be reproduced from the code and data in the repository.
+| `README.md` | This file. |
+| `v1-artifacts/README.md` | Why the model bundles and datasets were removed rather than kept: the audit works by describing code, and none of a missing bundle key or a feature-vector width mismatch is checkable by opening a pickle. |
+| `../experiments/` | Scratch space, and the same record. |
+| `../syrth_scan.py` | The v1 inference entry point, now a 94-line shim that forwards to the current CLI and prints a retirement notice. Kept because callers invoke it, and a shim that answers tells them what happened where a missing module only tells them nothing did. |
 
 ## What replaced it
 
-`syrth/` — a risk-surface analyser that reports the nearest vulnerability class
-with a likelihood and its evidence. See [`../docs/risk-model.md`](../docs/risk-model.md).
-
-## Do not
-
-- Do not run these scripts expecting them to work. They depend on datasets that
-  are not committed and on libraries the project no longer uses.
-- Do not copy security decisions from here. The sink tables, sanitisers and label
-  space all changed.
-- Do not quote any figure that appears in these files or in the v1 sections of
-  `docs/CHANGELOG.md`. They are historical records, not results.
-
-## Import path note
-
-These scripts reference each other and the repository root by relative path, which
-no longer resolves after the move. That breakage is expected and is not a
-regression: the directory is archival.
+The pipeline was rewritten rather than patched: a typed sink and sanitiser registry,
+tree-sitter trace extraction, cross-function flow resolution, and a corpus built
+from real advisories by `tools/build_corpus.py`. The current architecture is in
+[`../docs/architecture.md`](../docs/architecture.md), and the measurements that
+replaced the withdrawn ones are in
+[`../docs/benchmark.md`](../docs/benchmark.md).

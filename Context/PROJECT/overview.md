@@ -84,7 +84,7 @@ internally is invisible.
 
 ## Historical context
 
-v1 (`experiments/v1/`, `legacy/`, root `*.py`) was a five-model ensemble plus a
+v1 (the scripts now deleted, recorded in `legacy/` and `experiments/`) was a five-model ensemble plus a
 stacking meta-learner that supplied the ground-truth CWE description as a
 feature. It was audited, found to have a dead meta-learning stage with a
 hardcoded RCE class index, and retired. Its figures are withdrawn. The v1 tree is

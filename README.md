@@ -113,8 +113,8 @@ benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
 tests/        625 tests
 docs/         the contract, the measurements, and their limits
-legacy/       the retired v1 scripts, kept so the withdrawal can be checked
-experiments/  v1 pipeline scripts; their numbers are withdrawn
+legacy/       why the retired v1 pipeline was deleted, and how to check the audit
+experiments/  scratch space; the v1 scripts that were here are gone
 paper/        WITHDRAWN.md -- which v1 results were withdrawn, and why
 Context/      project state, decisions, and open issues
 RLTESTS/      smoke-test fixtures: deliberately vulnerable modules

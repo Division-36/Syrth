@@ -96,7 +96,7 @@ the dangerous operation. Specific and fixable in the registry.
 1. Train the ranker on `data/corpus.jsonl` with a split grouped on `group`,
    and report held-out numbers.
 2. Version migration: current code becomes **1.0.0**, the v1-era code in
-   `legacy/v1-scripts` and `docs/archive` becomes **v0.x**. Git tags need a plan
+   the deleted v1 scripts become **v0.x**. Git tags need a plan
    before anything is rewritten.
 3. Widen the harvest for the remaining four classes.
 
