@@ -91,47 +91,25 @@ separately. `direct-sink` is a proof about the labelled source; `module-proximit
 names the module-level sink it relied on and is checkable against the recorded
 repo, commit and file.
 
-### `data/cve_pairs.jsonl` -- the superseded corpus
-
-`[VERIFIED 2026-10-02]` -- 498 records. Retained for history; **not a valid
-measurement target**, for the reasons in
-[corpus_failure_diagnosis.md](corpus_failure_diagnosis.md).
-
-```console
-$ python -m benchmarks.risk_metrics --dataset data/cve_pairs.jsonl
-==================================================================
-SYRTH risk-model benchmark
-==================================================================
-records with sinks found      : 52/498
-category coverage             : 57/63 = 90.5%
-rank agreement (better-evidence first): 22/22 = 100.0%
-rename invariance             : 494/498 = 99.2%
-patch kill rate (confirmed)   : 65/76 = 85.5%
-determinism (repeat run)      : 498/498 = 100.0%
-
-per class (covered/expected):
-  CWE-22     26/26
-  CWE-601    9/9
-  CWE-79     20/26
-  CWE-918    2/2
-```
-
 ### Reading these numbers honestly
 
-- **Coverage denominators are small: 57 and 63.** These are the classes an
+- **Coverage denominators are small: 111 and 116.** These are the classes an
   independent AST scan can prove are present, not every class the corpus could
-  contain. A single missed record moves the figure by roughly 1.8 points.
-- **Rank agreement is 2/2 on the built corpus.** That is a consistency check on
-  two cases, not a statistical claim. The 22/22 on the superseded corpus is the
-  larger sample.
-- **Rename invariance is 100% on the built corpus and 99.2% on the old one.** The
-  four records that changed class set under renaming are all in the superseded
-  corpus, which has no provenance to explain them.
-- **Kill rate fell to 80.7% from 85.5%** on the built corpus. The built corpus
-  contains harder cases -- keras' `ShardedH5IOStore`, notebook's redirect guard --
-  where the patch adds a validation check rather than removing the sink call, so
-  the sink survives by design. This is a real difference in difficulty, not a
-  regression in the analyser.
+  contain. A single missed record moves the figure by roughly 0.9 points.
+- **Rank agreement is a consistency check, not a statistic.** 22/22 means that
+  whenever two findings in one function differ in evidence strength, the
+  better-evidenced one is reported first. It says nothing about how often the
+  tool finds a real vulnerability.
+- **Kill rate measures the corpus, not the tool.** 89/100 is the share of patched
+  records where the class's own mitigation removed the confirmed flow. A patch
+  that replaces a vulnerable call with a validation check leaves the sink call in
+  place by design, so the record still reports. Those cases are the boundary
+  described in [What the survivors are](#what-the-survivors-are-and-what-they-are-not).
+- **Determinism and rename invariance are properties, not scores.** They show that
+  the same input twice gives the same answer, and that renaming identifiers does
+  not change the reported classes. Both are at 100%.
+
+
 ## The kill-rate question, adjudicated
 
 `[VERIFIED 2026-10-04]` -- patch kill rate rose from **76.0% to 89.0%** with

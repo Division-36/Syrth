@@ -114,7 +114,12 @@ class TestMeasurementTables:
     """The published numbers must match a live run, not a remembered one."""
 
     def test_tables_match_a_live_harness_run(self):
-        corpus = ROOT / "data" / "cve_pairs.jsonl"
+        # The built corpus, not data/cve_pairs.jsonl. The superseded corpus is
+        # mislabelled and its figures were withdrawn; checking the documentation
+        # against it would fail on the very numbers that are no longer published,
+        # which is why this test pointed at it and then stopped agreeing with the
+        # docs it was supposed to protect.
+        corpus = ROOT / "data" / "corpus.jsonl"
         if not corpus.exists():
             pytest.skip("benchmark corpus is not generated in this checkout")
 
