@@ -75,7 +75,39 @@ SEMGREP_CMD = ["uvx", "--from", "semgrep", "semgrep"]
 SEMGREP_CONFIGS = (
     ("semgrep", "p/security-audit"),
     ("semgrep-owasp", "p/owasp-top-ten"),
+    ("semgrep-python", "p/python"),
 )
+
+#: Tools that do not publish CWE metadata in their machine-readable output. They
+#: are measured on the sink-presence axis below rather than dropped: ruff's ``S``
+#: rules and pylint's security messages both find real sinks, they just do not
+#: label them with a class, and excluding them would flatter the table.
+NO_CWE_TOOLS = frozenset({"ruff", "pylint"})
+RUFF_CMD = ["uvx", "--from", "ruff", "ruff"]
+
+#: Ruff rule code -> the sink it names, so ruff can be scored on the sink axis
+#: despite publishing no CWE. These are *sink identities* (the call the rule
+#: points at), not class labels, and they are read off each rule's own
+#: documentation. A rule absent from this map is recorded as an unmapped finding
+#: rather than guessed at, exactly as a class-less Bandit finding is.
+#: Sanitiser assertions, treated as sink contacts on the sink axis only.
+_MARKUP_SINKS = frozenset({"Markup", "mark_safe", "SafeString"})
+
+RUFF_RULE_SINKS = {
+    "S301": "pickle.loads",
+    "S302": "pickle.load",
+    "S307": "eval",
+    "S506": "yaml.load",
+    "S605": "os.system",
+    "S607": "subprocess",
+    "S609": "subprocess",
+    "S602": "subprocess.run",
+    "S404": "subprocess",
+    "S310": "urllib.request.urlopen",
+    "S501": "requests.get",
+    "S704": "markupsafe.Markup",
+    "S308": "markupsafe.Markup",
+}
 
 _CWE_IN_TEXT = re.compile(r"CWE-(\d+)")
 
@@ -88,6 +120,10 @@ class ToolResult:
     version: str = ""
     #: record id -> classes named
     named: dict[str, set[str]] = field(default_factory=dict)
+    #: record id -> set of "callname@line" the tool flagged. Present for every
+    #: instrument, CWE-labelled or not, and the only axis on which a tool that
+    #: publishes no CWE metadata can be compared at all.
+    touched_sinks: dict[str, set[str]] = field(default_factory=dict)
     #: findings whose rule carries no CWE, by record id
     unmapped: dict[str, int] = field(default_factory=dict)
     seconds: float = 0.0
@@ -198,15 +234,24 @@ def _run(command: list[str], cwd: Path | None = None) -> subprocess.CompletedPro
     )
 
 
-def _parse_json_output(raw: str) -> dict[str, Any] | None:
-    """Both tools print JSON, but semgrep may precede it with warnings."""
-    start = raw.find("{")
-    while start != -1:
-        try:
-            return json.loads(raw[start:])
-        except json.JSONDecodeError:
-            start = raw.find("{", start + 1)
-    return None
+def _parse_json_output(raw: str) -> Any | None:
+    """The JSON payload a tool printed, or None.
+
+    Semgrep may precede its JSON with warnings and ruff emits a top-level array
+    rather than an object, so this scans for the first ``[`` or ``{`` and takes
+    the first position from which the remainder parses. Tool output is not
+    guaranteed to start with the payload, and a harness that assumes it does will
+    report "unavailable" for a tool that ran perfectly.
+    """
+    best = None
+    for open_ch in ("{", "["):
+        start = raw.find(open_ch)
+        while start != -1:
+            try:
+                return json.loads(raw[start:])
+            except json.JSONDecodeError:
+                start = raw.find(open_ch, start + 1)
+    return best
 
 
 def run_bandit(paths: dict[str, Path]) -> ToolResult:
@@ -240,6 +285,11 @@ def run_bandit(paths: dict[str, Path]) -> ToolResult:
             result.named.setdefault(identifier, set()).update(classes)
         else:
             result.unmapped[identifier] = result.unmapped.get(identifier, 0) + 1
+        _record_sink(
+            result, identifier,
+            str(finding.get("test_name") or finding.get("issue_text") or ""),
+            int(finding.get("line_number") or 0),
+        )
     return result
 
 
@@ -276,6 +326,52 @@ def run_semgrep(paths: dict[str, Path], config: str, name: str = "semgrep") -> T
             result.named.setdefault(identifier, set()).update(classes)
         else:
             result.unmapped[identifier] = result.unmapped.get(identifier, 0) + 1
+        _record_sink(
+            result, identifier,
+            (finding.get("check_id") or "").rsplit(".", 1)[-1],
+            int((finding.get("start") or {}).get("line") or 0),
+        )
+    return result
+
+
+
+def run_ruff(paths: dict[str, Path]) -> ToolResult:
+    """Ruff's flake8-bandit port. It publishes no CWE, so it is scored on sinks."""
+    result = ToolResult(name="ruff")
+    by_name = {p.name: rid for rid, p in paths.items()}
+    command = RUFF_CMD + [
+        "check", "--select", "S", "--output-format", "json", "--no-cache",
+        "--quiet", str(next(iter(paths.values())).parent),
+    ]
+    started = time.perf_counter()
+    try:
+        completed = _run(command)
+    except (OSError, subprocess.SubprocessError) as exc:
+        result.available = False
+        result.error = f"{type(exc).__name__}: {exc}"
+        return result
+    result.seconds = time.perf_counter() - started
+    # ruff, like every linter, exits non-zero when it finds violations. That is
+    # the tool working, not the tool failing, so the exit code is deliberately not
+    # consulted; only an unparsable payload counts as unavailable.
+    payload = _parse_json_output(completed.stdout)
+    if not isinstance(payload, list):
+        result.available = False
+        result.error = (completed.stderr or completed.stdout or "")[:400]
+        return result
+    for finding in payload:
+        identifier = by_name.get(Path(finding.get("filename", "")).name)
+        if identifier is None:
+            continue
+        # ruff's S rules are the flake8-bandit port, so the rule name is the same
+        # sink name the AST ground truth uses: "subprocess-popen-with-shell-equals-true"
+        # names subprocess.run. Recorded as-is; the sink axis matches on the call
+        # the rule reports, not on a hand-built CWE table.
+        code = finding.get("code", "")
+        sink = RUFF_RULE_SINKS.get(code)
+        if sink:
+            result.touched_sinks.setdefault(identifier, set()).add(sink)
+        result.unmapped[identifier] = result.unmapped.get(identifier, 0) + 1
     return result
 
 
@@ -295,6 +391,11 @@ def run_syrth(records: list[dict[str, Any]], threshold: float = 0.5) -> ToolResu
                 mapped.add(label)
         if mapped:
             result.named[identifier] = mapped
+        for finding in report.findings:
+            if finding.lineno:
+                result.touched_sinks.setdefault(identifier, set()).add(
+                    _sink_key(finding.sink_call, finding.lineno)
+                )
     result.seconds = time.perf_counter() - started
     result.version = "syrth (in-process)"
     return result
@@ -327,6 +428,16 @@ class Coverage:
     missed_mitigations: int = 0
     #: Of those, how many it stopped naming after the patch.
     noticed_mitigation: int = 0
+    #: Sink-presence axis: how many of the sinks the AST scan proves present this
+    #: tool flagged, and how many such sinks exist. Computable for every tool,
+    #: including those that publish no CWE.
+    sinks_covered: int = 0
+    sinks_expected: int = 0
+    sink_measurable: bool = True
+
+    @property
+    def sink_percent(self) -> float:
+        return 100.0 * self.sinks_covered / self.sinks_expected if self.sinks_expected else 0.0
 
     @property
     def percent(self) -> float:
@@ -383,8 +494,86 @@ def compare(
         coverage.measurable_pairs, coverage.missed_mitigations, \
             coverage.noticed_mitigation = mitigation_counts(
                 records, result, expected)
+        sink_expected = {
+            record_id(r): expected_sinks(r["source"]) for r in records
+        }
+        total_sinks = sum(len(v) for v in sink_expected.values())
+        hit_sinks = 0
+        for identifier, sinks in sink_expected.items():
+            touched = result.touched_sinks.get(identifier, set())
+            for key in sinks:
+                call = key.split("@")[0]
+                if any(t == key or t.startswith(call) or call in t for t in touched):
+                    hit_sinks += 1
+        coverage.sinks_covered = hit_sinks
+        coverage.sinks_expected = total_sinks
         coverages[name] = coverage
     return coverages
+
+
+
+
+def _sink_key(call: str, line: int) -> str:
+    """Identity of one sink call site, independent of any CWE label."""
+    return f"{call}@{line}"
+
+
+def expected_sinks(source: str) -> set[str]:
+    """Every sink call site the source demonstrably contains, as ``call@line``.
+
+    Class coverage needs a CWE per sink and so cannot score an instrument that
+    publishes no CWE metadata. This axis needs only the call and its line, which
+    puts ruff and pylint on equal footing with the rest: *did you look at the same
+    dangerous operation this file provably contains*.
+
+    It walks the same AST as :func:`expected_classes`, deliberately, and imports
+    the same tables. If the two ever diverged the class and sink axes would be
+    scoring different things and neither would be comparable to the other.
+    """
+    import ast as _ast
+
+    from benchmarks.risk_metrics import (
+        _ALWAYS_NEEDS_VALUE,
+        _QUALIFIED_SINKS,
+        _SINK_NAME_TO_CWE,
+        _qualified_name,
+    )
+
+    try:
+        tree = _ast.parse(source)
+    except (SyntaxError, ValueError):
+        return set()
+
+    out: set[str] = set()
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.Call):
+            continue
+        call = _qualified_name(node)
+        if call in _QUALIFIED_SINKS:
+            out.add(_sink_key(call, node.lineno))
+            continue
+        func = node.func
+        name = func.attr if isinstance(func, _ast.Attribute) else (
+            func.id if isinstance(func, _ast.Name) else ""
+        )
+        if not name:
+            continue
+        if call in _MARKUP_SINKS or name in _MARKUP_SINKS:
+            # A sanitiser assertion is a sink contact as much as `eval` is, and
+            # ruff's S704 exists precisely because it is. It is deliberately not
+            # part of the *class* table above, which is why this axis can score a
+            # rule the class axis cannot.
+            out.add(_sink_key(call or name, node.lineno))
+            continue
+        if any(name in names for names in _SINK_NAME_TO_CWE.values()):
+            if name in _ALWAYS_NEEDS_VALUE and not node.args:
+                continue
+            out.add(_sink_key(name, node.lineno))
+    return out
+
+
+def _record_sink(result: ToolResult, identifier: str, call: str, line: int) -> None:
+    result.touched_sinks.setdefault(identifier, set()).add(_sink_key(call, line))
 
 
 
@@ -480,7 +669,7 @@ def render(
              "CWE attribution is each tool's own metadata; unmapped findings are",
              "counted, never guessed into a class.",
              ""]
-    header = (f"{'tool':<14}{'coverage':>12}{'':>7}"
+    header = (f"{'tool':<14}{'coverage':>12}{'':>7}{'sinks':>12}{'':>7}"
               f"{'fix noticed':>14}{'still flagged':>15}{'seconds':>9}")
     lines.append(header)
     lines.append("-" * len(header))
@@ -490,9 +679,11 @@ def render(
                          f"{'-':>14}{'-':>15}{'-':>9}")
             lines.append(f"               {coverage.error[:58]}")
             continue
+        cls = f"{coverage.covered}/{coverage.expected}"
+        snk = f"{coverage.sinks_covered}/{coverage.sinks_expected}"
         lines.append(
-            f"{name:<14}{f'{coverage.covered}/{coverage.expected}':>12}"
-            f"{f'{coverage.percent:.1f}%':>7}"
+            f"{name:<14}{cls:>12}{f'{coverage.percent:.1f}%':>7}"
+            f"{snk:>12}{f'{coverage.sink_percent:.1f}%':>7}"
             f"{f'{coverage.noticed_mitigation}/{coverage.measurable_pairs}':>14}"
             f"{f'{coverage.missed_mitigations}/{coverage.measurable_pairs}':>15}"
             f"{coverage.seconds:>9.2f}"
@@ -574,6 +765,8 @@ def main(argv: list[str] | None = None) -> int:
             if name in args.skip:
                 continue
             results[name] = run_semgrep(paths, config, name)
+        if "ruff" not in args.skip:
+            results["ruff"] = run_ruff(paths)
     finally:
         shutil.rmtree(directory, ignore_errors=True)
 
@@ -599,6 +792,9 @@ def main(argv: list[str] | None = None) -> int:
                     "still_flagged_after_fix": c.missed_mitigations,
                     "measurable_pairs": c.measurable_pairs,
                     "fix_noticed_percent": round(c.mitigation_percent, 2),
+                    "sinks_covered": c.sinks_covered,
+                    "sinks_expected": c.sinks_expected,
+                    "sink_percent": round(c.sink_percent, 2),
                     "classes_modelled": sorted(
                         {k for k in c.per_class_covered}),
                     "per_class": {

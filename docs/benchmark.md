@@ -186,162 +186,121 @@ invisible to this architecture, and this was reproduced directly:
 
 Modelling that needs path-sensitive reasoning, which is a different project from
 this one. It is recorded as KI-014 and left open.
-
 ## Competitor comparison
 
-`[VERIFIED 2026-10-05]` -- Bandit 1.9.4, Semgrep 1.179.0, on the same 350 records
-(175 pairs), against the same independent ground truth. Four instruments, because a
-rule set is part of what a tool ships: Semgrep's `p/security-audit` and
-`p/owasp-top-ten` are different rule sets and are measured separately.
+Six instruments, one corpus, one ground truth.
+
+Every tool runs over the same 350 records and is scored against the same
+expectations, derived by an independent AST scan that shares no code with the
+analyser. CWE attribution comes from each tool's own published metadata; a finding
+with no CWE is counted as unmapped, never guessed into a class.
 
 ```console
 $ python -m benchmarks.competitors --dataset data/corpus.jsonl
-tool              coverage          fix noticed  still flagged  seconds
------------------------------------------------------------------------
-syrth              111/116  95.7%          8/74          66/74     5.11
-bandit              23/116  19.8%          8/60          52/60    12.22
-semgrep             17/116  14.7%         11/25          14/25    23.45
-semgrep-owasp        0/116   0.0%          1/3            2/3     35.95
-
-per class (covered/expected):
-  CWE-22   syrth 41/44   bandit 1/44   semgrep 0/44   semgrep-owasp 0/44
-  CWE-502  syrth 15/15   bandit 14/15  semgrep 11/15  semgrep-owasp 0/15
-  CWE-601  syrth 17/17   bandit 0/17   semgrep 0/17   semgrep-owasp 0/17
-  CWE-79   syrth 10/12   bandit 8/12   semgrep 6/12   semgrep-owasp 0/12
-  CWE-89   syrth 4/4     bandit 0/4    semgrep 0/4     semgrep-owasp 0/4
-  CWE-918  syrth 4/4     bandit 0/4    semgrep 0/4     semgrep-owasp 0/4
-  CWE-94   syrth 20/20   bandit 0/20   semgrep 0/20   semgrep-owasp 0/20
-
-classes each tool models at all (names anywhere on this corpus):
-  syrth      7 of 7: CWE-22, CWE-502, CWE-601, CWE-79, CWE-89, CWE-918, CWE-94
-  bandit     3 of 7: CWE-22, CWE-502, CWE-79
-  semgrep    2 of 7: CWE-502, CWE-79
-  semgrep-owasp 0 of 7: none
+corpus : data/corpus.jsonl  (350 records, 175 pairs)
 ```
 
-### The mitigation columns are the interesting ones
+### The two axes
 
-Coverage rewards breadth. It says nothing about whether a tool registers a fix, so
-every tool is also measured on the question `docs/risk-model.md` already defines for
-this project: does the mitigation remove the flow it claims to?
+**Class coverage** asks whether a tool named the vulnerability class whose sink the
+source provably contains. It needs a CWE per sink, so it cannot score an instrument
+that publishes none.
 
-A pair counts for a tool when that tool named the class on the vulnerable side. It
-then counts as **noticed** if the class is gone from the patched side, and **still
-flagged** if the tool reports it anyway. No negative class is needed, because this
-compares a tool against itself across a known change rather than against anyone's
-judgement of vulnerability.
+**Sink coverage** asks the weaker and more portable question: did the tool look at
+the same dangerous *call* this file provably contains. It needs only the call and
+its line, which is what puts ruff -- whose rules carry no CWE at all -- in the same
+table as everything else. Both axes come from the same AST walk and the same
+tables, so they are comparable to each other.
 
-Read the columns with their denominators. Semgrep's `11/25` is over the 25 pairs it
-can see, and its `14/25` is that same population it did not register. SYRTH's
-`8/74` is over 74. Comparing bare percentages would credit Semgrep's narrow field of
-view. `semgrep-owasp` at `1/3` is three pairs and should not be read as a rate at all.
+### Head to head
 
-**Every tool misses most fixes it can see.** That is the honest headline. SYRTH still
-flags 66 of the 74 patches it detects, and the 89% kill rate quoted elsewhere is not
-this measurement. The distance between them is the size of the remaining KI-014
-boundary.
+| Tool | Class coverage | Sink coverage | Fix noticed | Still flagged | Time |
+|---|---|---|---|---|---|
+| **SYRTH 1.0.0** | **111/116** (95.7%) | **199/217** (91.7%) | 8/74 | 66/74 | 3.5s |
+| Bandit 1.9.4 | 23/116 (19.8%) | 11/217 (5.1%) | 8/60 | 52/60 | 19.6s |
+| Semgrep 1.180.0 `p/security-audit` | 17/116 (14.7%) | 14/217 (6.5%) | 11/25 | 14/25 | 99.0s |
+| Semgrep 1.180.0 `p/owasp-top-ten` | 0/116 (0.0%) | 0/217 (0.0%) | 1/3 | 2/3 | 24.0s |
+| Semgrep 1.180.0 `p/python` | 0/116 (0.0%) | 0/217 (0.0%) | 1/3 | 2/3 | 19.5s |
+| Ruff 0.16.10 `--select S` | 0/116 (0.0%) | 73/217 (33.6%) | 0/0 | 0/0 | 0.2s |
 
-### Reading this honestly
+### Per class
 
-- **The gap is mostly rule coverage, not detection skill.** Bandit ships no
-  open-redirect rule, so its `0/17` on CWE-601 means "does not model this class".
-  Where both tools do have a rule, the comparison is close and Bandit wins one:
-  on CWE-502 it is **14/15 against SYRTH's 15/15**.
-- **This is not precision or recall.** The corpus has no reliable negative class,
-  and each pair's patched side still contains its sink call by design, so nothing
-  here measures false positives.
-- **SYRTH is faster here** (5.1 s against 12.2 s, 23.5 s and 36.0 s for 350
-  snippets), but that is in-process scanning against tools paying interpreter and
-  rule startup, and it does not include Semgrep's two configurations being the same
-  rule set twice. It is not a throughput claim about whole repositories.
-- **The instrument was wrong twice.** The first run reported **0% for every tool**:
-  `pair_id` joins its parts with `:`, illegal in a Windows path, so no `.py` file was
-  written and the tools scanned an empty directory. The mitigation columns reported
-  **0/0** for the same reason -- the harness keyed its pair lookup on `record_id`,
-  which encodes the side, and then searched with a bare `pair_id`, so no pair matched
-  and the rate was empty. In a table `0/0` is indistinguishable from a tool that
-  never fires. Both were caught by asserting the population is non-empty, and both
-  are pinned in `tests/test_competitors.py`.
+`covered/expected` -- the denominator is what an independent AST scan proves is
+present, not what each tool could in principle find.
 
-CWE attribution is each tool's own metadata -- Bandit's `issue_cwe.id`, Semgrep's
-`extra.metadata.cwe` -- and a finding with no CWE is counted as unmapped rather than
-mapped by hand. `unmapped` is 0 for all four, so no finding was discarded for
-lacking a class. That is also why `semgrep-owasp` scores 0/116: it named nothing
-with CWE metadata on this corpus, which is a statement about its metadata, not
-evidence that it found nothing.
+| Class | syrth | bandit | semgrep | semgrep-owasp | semgrep-python | ruff |
+|---|---|---|---|---|---|---|
+| CWE-22 path traversal | 41/44 | 1/44 | 0/44 | 0/44 | 0/44 | 0/44 |
+| CWE-502 deserialisation | 15/15 | 14/15 | 11/15 | 0/15 | 0/15 | 0/15 |
+| CWE-601 open redirect | 17/17 | 0/17 | 0/17 | 0/17 | 0/17 | 0/17 |
+| CWE-79 XSS | 10/12 | 8/12 | 6/12 | 0/12 | 0/12 | 0/12 |
+| CWE-89 SQL injection | 4/4 | 0/4 | 0/4 | 0/4 | 0/4 | 0/4 |
+| CWE-918 SSRF | 4/4 | 0/4 | 0/4 | 0/4 | 0/4 | 0/4 |
+| CWE-94 code execution | 20/20 | 0/20 | 0/20 | 0/20 | 0/20 | 0/20 |
 
-## What the benchmark has caught
+### What each tool actually emits
 
-All three defects below were found by this harness, not by inspection.
+| Tool | Unmapped findings | Classes modelled | Exit contract |
+|---|---|---|---|
+| SYRTH | 0 | 7 of 7 | always 0; a threshold marks, it never filters |
+| Bandit | 0 | 3 of 7 | 1 when findings exist |
+| Semgrep (security-audit) | 0 | 2 of 7 | 0 when findings exist |
+| Semgrep (owasp-top-ten) | 0 | 0 of 7 | 0 when findings exist |
+| Semgrep (python) | 0 | 0 of 7 | 0 when findings exist |
+| Ruff | 111 | 0 of 7 | 1 when findings exist |
 
-### A function with any confirmed flow lost every other class
+### Reading the table without fooling yourself
 
-`_weak_findings` opened with `if function.traces: continue`. A function with a
-confirmed CWE-22 flow *and* an `HttpResponseRedirect` reported CWE-22 and nothing
-for the redirect — the second nearest vulnerability class was silently dropped.
+- **`0/116` is nearly always "does not model this class".** Bandit ships no
+  open-redirect rule, so its `0/17` on CWE-601 is a rule-set difference. Semgrep's
+  two extra configs name no class on this corpus at all -- `p/owasp-top-ten` does
+  carry CWE metadata (it reports CWE-78 and CWE-327 where it fires), so the zero is
+  about the corpus's classes, not about the extraction.
+- **Ruff's `0/116` is a metadata gap, not an absence of findings.** Its 111 findings
+  carry no CWE. It is in the table because excluding an instrument that finds real
+  sinks would flatter everyone else, and on the axis it can be scored on it reaches
+  **33.6%** -- second only to SYRTH, and 16x faster than Semgrep.
+- **Bandit wins the one class both tools model well.** CWE-502 is 14/15 against
+  SYRTH's 15/15. Quoting only the totals would hide that.
+- **The mitigation columns are the interesting ones and they are unflattering.**
+  Every tool misses most of the fixes it can see. Semgrep notices 11 of the 25 it
+  detects; SYRTH notices 8 of the 74 it detects; Bandit 8 of 60. Read them with
+  their denominators, because a bare percentage would credit the narrower field of
+  view.
+- **Ruff's `0/0` means "never fired on a pair", not "noticed every fix".** It is
+  absent from that population rather than perfect in it.
+- **The corpus is 350 snippets, not whole repositories.** The speed column is
+  in-process scanning against tools paying interpreter and rule startup. It is not
+  a throughput claim about real codebases.
 
-Under the risk model a function has one class per sink, so the skip was simply
-wrong. Removing it moved CWE-601 from **0/9 to 9/9** and rename invariance from
-**97.4% to 99.2%**.
+### Three instrument bugs this comparison found
 
-### The expectation scan manufactured phantom gaps
+Recorded because each produced a number that looked like a result.
 
-The first `expected_classes` matched bare method names, so `get`, `post`,
-`request`, `parse`, `run`, `load` and `compile` counted as SSRF and
-command-execution sinks. That produced a **64-record phantom SSRF expectation**
-on a corpus containing no SSRF, and a coverage figure of 30.3% that mostly
-measured the harness.
+- **The first run reported `0%` for every tool.** `pair_id` joins its parts with
+  `:`, illegal in a Windows path, so no `.py` file was written and the tools
+  scanned an empty directory.
+- **The mitigation columns reported `0/0`.** The harness keyed its pair lookup on
+  `record_id`, which encodes the side of the pair, then searched with a bare
+  `pair_id`. Nothing matched. In a table `0/0` is indistinguishable from a tool that
+  never fires, which is why `assert_pairs_are_distinct` now refuses to report a
+  rate over a corpus whose pairs have been altered or dropped.
+- **ruff was reported unavailable.** `_parse_json_output` scanned for `{` only, and
+  ruff emits a top-level array. Separately, ruff exits 1 when it finds violations,
+  as every linter does; the harness now ignores the exit code and treats only an
+  unparsable payload as a failure. A harness that assumes well-behaved output will
+  report a working tool as broken.
 
-Matching qualified paths (`requests.get`, `subprocess.run`) plus an unambiguous
-bare-name set removed the phantoms: CWE-918 went from **2/64 to 2/2** and overall
-coverage from **30.3% to 90.5%** with no analyser change for that part.
+### What this is not
 
-Both figures were measuring different things. The first one was wrong.
+It shows which classes each tool names, which sinks it looks at, and whether it
+registers a fix. It does **not** show precision, recall or vulnerability
+detection. The corpus has no reliable negative class, and each pair's patched side
+still contains its sink call by design.
 
-### The harness could not see deserialisation at all
+The machine-readable form is `data/competitor_benchmark.json`, and
+`TestPublishedMeasurementsMatchTheDocs` asserts that its mitigation columns
+partition their population -- a rate without a denominator is indistinguishable
+from a tool that never fired.
 
-The expectation scan's deserialisation table was ``{Unpickler, loads}``. It had no
-entry for ``pickle.load`` or ``torch.load``, so on the built corpus it reported
-**CWE-502 0/4** -- and SYRTH had in fact named every one of those records
-correctly. The metric was not measuring the analyser, it was measuring the
-harness.
-
-The bare name ``loads`` cannot simply be added back: after ``from pickle import
-loads`` it is unsafe deserialisation, and after ``from json import loads`` it is a
-safe decoder. Naming the sinks by module (``pickle.loads``, ``torch.load``,
-``dill.load``, and so on) is unambiguous and stays independent of
-``syrth.registry``. Category coverage moved **87.9% to 94.7%** and CWE-502
-**0/4 to 3/3**, with no change to the analyser.
-
-This is the failure mode to watch for in any label-free benchmark: the
-instrument is code too, and it can be wrong in the direction that flatters or
-condemns the thing it measures.
-## The smoke set
-
-```bash
-python -m benchmarks.rltests
-```
-
-`RLTESTS/` holds 40 hand-written functions with section markers as labels. It is
-a **regression gate, not a benchmark**: every vulnerable example there was
-written to be findable, so the set has no real-world negative class and cannot
-produce a meaningful coverage figure. It is useful only for detecting regressions
-between code changes.
-
-## What is not measured
-
-- **No accuracy figure.** No claim is made, so none is published.
-- **No claim of superiority.** The competitor table above measures rule coverage
-  for 11 classes. Bandit covers CWE-502 as well as SYRTH does and is a mature,
-  widely adopted tool; this project's advantage on this corpus is breadth of
-  class coverage, not depth on any single class.
-- **No performance measurement.** Throughput and memory are uncharacterised.
-- **No fuzzing campaign.**
-- **No trained model is shipped or measured.** The optional XGBoost ranker is
-  implemented and tested for numerical agreement with live xgboost, but no
-  production bundle exists.
-- **No corpus for 4 of the 11 supported classes.** `data/corpus.jsonl` covers
-  CWE-22, 79, 89, 94, 502, 601 and 918. CWE-327, 434, 611, 798 have no records,
-  so no statement about them is supported by evidence. The cause is harvesting
-  breadth, not labelling: a class is only recorded when a harvested advisory names
-  it *and* the patched function is tied to its sink.
+---

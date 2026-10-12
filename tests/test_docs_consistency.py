@@ -206,7 +206,7 @@ class TestPublishedMeasurementsMatchTheDocs:
         assert report["records"] == 350
         assert report["pairs"] == 175
         assert set(report["tools"]) == {
-            "syrth", "bandit", "semgrep", "semgrep-owasp",
+            "syrth", "bandit", "semgrep", "semgrep-owasp", "semgrep-python", "ruff",
         }
 
     def test_every_published_tool_reports_its_own_population(self):

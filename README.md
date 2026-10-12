@@ -87,23 +87,40 @@ against an **independent AST scan** that shares no code with the analyser:
 | patch kill rate | **89.0%** (89/100) |
 | determinism | **100%** (350/350) |
 
-Against the same corpus and the same ground truth:
+Against the same corpus, the same ground truth, and six instruments. **Sink
+coverage** is the stronger axis: it asks only whether each tool looked at the same
+dangerous call the AST scan proves is present, so it scores tools that publish no
+CWE metadata.
 
-| Tool | Coverage | Fix noticed | Still flagged |
-|---|---|---|---|
-| **syrth** | **111/116 (95.7%)** | 8/74 | 66/74 |
-| bandit 1.9.4 | 23/116 (19.8%) | 8/60 | 52/60 |
-| semgrep 1.179.0 (`p/security-audit`) | 17/116 (14.7%) | 11/25 | 14/25 |
+| Tool | Class coverage | Sink coverage | Fix noticed | Still flagged | Time |
+|---|---|---|---|---|---|
+| **SYRTH 1.0.0** | **111/116** (95.7%) | **199/217** (91.7%) | 8/74 | 66/74 | 3.5s |
+| Bandit 1.9.4 | 23/116 (19.8%) | 11/217 (5.1%) | 8/60 | 52/60 | 19.6s |
+| Semgrep 1.180.0 `p/security-audit` | 17/116 (14.7%) | 14/217 (6.5%) | 11/25 | 14/25 | 99.0s |
+| Semgrep `p/owasp-top-ten` | 0/116 (0.0%) | 0/217 (0.0%) | 1/3 | 2/3 | 24.0s |
+| Semgrep `p/python` | 0/116 (0.0%) | 0/217 (0.0%) | 1/3 | 2/3 | 19.5s |
+| Ruff 0.16.10 `--select S` | 0/116 (0.0%) | 73/217 (33.6%) | 0/0 | 0/0 | 0.2s |
 
-Two caveats stated plainly. The coverage gap is mostly **rule coverage**: Bandit
-ships no open-redirect rule, so its `0/17` on CWE-601 means "does not model this
-class", and where both tools have a rule Bandit wins one — `14/15` on CWE-502
-against SYRTH's `15/15`. And the last two columns are the interesting ones: **every
-tool misses most of the fixes it can see.** Read them with their denominators;
-`semgrep`'s `11/25` is over 25 pairs it can detect.
+Four caveats stated plainly, because the table is easy to misread:
+
+- **A `0/116` usually means "does not model this class", not "found nothing".**
+  Bandit ships no open-redirect rule and Semgrep's two extra configs carry no rules
+  for the seven classes here. Where both tools do have a rule, Bandit wins one:
+  **14/15** against SYRTH's **15/15** on CWE-502.
+- **Ruff's `0/116` is a metadata gap.** It names 111 findings and none carries a
+  CWE, so the class axis cannot score it. It is in the table because dropping it
+  would flatter everyone else — and on the axis it *can* be scored on, it reaches
+  33.6%, second only to SYRTH.
+- **Read the mitigation columns with their denominators.** Semgrep's `11/25` is
+  over the 25 pairs it can detect; SYRTH's `8/74` is over 74. Bare percentages
+  would credit the narrower field of view.
+- **Every tool misses most of the fixes it can see.** SYRTH still flags 66 of the
+  74 patches it detects. This is the honest headline and it is not flattering.
 
 This is not a precision or recall measurement. The corpus has no reliable negative
-class, and each pair's patched side still contains its sink call by design.
+class, and each pair's patched side still contains its sink call by design. The
+full per-class matrix and the methodology are in
+[docs/benchmark.md](docs/benchmark.md#competitor-comparison).
 
 ## Repository layout
 
@@ -111,7 +128,7 @@ class, and each pair's patched side still contains its sink call by design.
 syrth/        the analyser: parser, taint, registry, guards, reporting
 benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
-tests/        627 tests
+tests/        631 tests
 docs/         the contract, the measurements, and their limits
 legacy/       why the retired v1 pipeline was deleted, and how to check the audit
 experiments/  scratch space; the v1 scripts that were here are gone

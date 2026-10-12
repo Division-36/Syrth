@@ -116,3 +116,63 @@ class TestMitigationPercent:
             name="t", measurable_pairs=10, noticed_mitigation=5, missed_mitigations=5
         )
         assert coverage.mitigation_percent == 50.0
+
+class TestPublishedComparisonIsComplete:
+    """Every instrument that ran must be documented, and its figures must match.
+
+    The competitor table grew from three instruments to six, and a comparison that
+    quietly drops an instrument is worse than one that never ran it: excluding ruff
+    because it publishes no CWE would have removed the second-best sink score from
+    the table. These assertions fail if a run produces a tool the docs do not
+    mention, or if a published figure disagrees with the JSON it came from.
+    """
+
+    EXPECTED = {"syrth", "bandit", "semgrep", "semgrep-owasp", "semgrep-python", "ruff"}
+
+    @staticmethod
+    def _report() -> dict:
+        import json
+
+        path = pathlib.Path(__file__).resolve().parents[1] / "data" / "competitor_benchmark.json"
+        assert path.exists(), "run benchmarks/competitors.py --json before this check"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_every_measured_instrument_is_documented(self):
+        report = self._report()
+        assert set(report["tools"]) == self.EXPECTED, (
+            "the published comparison and the instruments disagree; a tool that ran "
+            "but is not in the table is a comparison that was curated"
+        )
+
+    def test_published_figures_match_the_json(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        report = self._report()
+        for name in ("README.md", "docs/benchmark.md"):
+            text = (root / name).read_text(encoding="utf-8")
+            for instrument, values in report["tools"].items():
+                assert f"{values['covered']}/{values['expected']}" in text, (
+                    f"{name} does not carry {instrument}'s class coverage"
+                )
+                assert f"{values['sinks_covered']}/{values['sinks_expected']}" in text, (
+                    f"{name} does not carry {instrument}'s sink coverage"
+                )
+
+    def test_sink_axis_is_measurable_for_every_instrument(self):
+        # A tool with no CWE metadata must still be scorable on sinks, which is the
+        # reason the axis exists. If any instrument reports zero expected sinks, the
+        # axis has silently stopped measuring anything.
+        report = self._report()
+        for instrument, values in report["tools"].items():
+            assert values["sinks_expected"] > 0, (
+                f"{instrument} has no expected sinks; the sink axis is not measuring"
+            )
+
+    def test_a_tool_without_cwe_metadata_is_still_present(self):
+        # ruff names 111 findings and publishes no CWE. If it is ever scored 0/0 on
+        # the class axis and dropped from the table, the comparison has been curated
+        # to flatter SYRTH.
+        report = self._report()
+        assert "ruff" in report["tools"]
+        assert report["tools"]["ruff"]["unmapped_findings"] > 0, (
+            "ruff suddenly reports CWE metadata; revisit how the class axis is set up"
+        )
