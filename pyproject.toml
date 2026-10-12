@@ -21,8 +21,13 @@ keywords = [
     "supply-chain",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    # A 1.x release, so 4-Beta understated it: the classifier pipeline is
+    # retired, the contract is settled, and the measurements are published.
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Operating System :: OS Independent",
@@ -30,7 +35,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Security",
-    "Topic :: Software Development :: Quality Assurance",
 ]
 
 # Runtime dependencies are exactly what the default (rules-only) scanner needs.
@@ -77,6 +81,7 @@ syrth = "syrth.scan:main"
 Homepage = "https://github.com/Division-36/Syrth"
 Repository = "https://github.com/Division-36/Syrth"
 Issues = "https://github.com/Division-36/Syrth/issues"
+Changelog = "https://github.com/Division-36/Syrth/blob/main/docs/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["syrth*"]

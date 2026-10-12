@@ -118,3 +118,17 @@ ones:
 - **26.7% of confirmed flows survive a recognised sanitiser**, so a correct patch
   can still be reported as vulnerable.
 - **No CI.** Nothing runs automatically; a regression can land silently.
+
+## Contributing to a release
+
+Pull requests run lint and the full suite on Linux, Windows and macOS, plus a
+rules-only install check that installs the package into a fresh virtualenv and
+verifies the C exporter imports with no numerical stack present. Linux is not
+interchangeable with the others: the exported header is only compiled where a
+compiler exists, so a matrix without it would skip the single test that catches a
+broken export.
+
+A tag pushes a build job that refuses to produce artefacts if the tag disagrees
+with the version in `pyproject.toml` or either `__version__` constant. That check
+exists because a release whose artefacts came from a different tree than its tag
+is the failure mode that `1.0.0` nearly became.
