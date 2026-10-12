@@ -56,15 +56,28 @@ jobs:
       # must import without numpy. This is the check that would have caught the
       # 1.0.0 packaging defect, so it runs on its own rather than inside a test
       # process that already has the dependency.
+      # venv puts scripts in bin/ on POSIX and Scripts/ on Windows, so the path is
+      # resolved rather than assumed. Hard-coding bin/ passed on every macOS and
+      # Linux run and failed only on Windows, which is the runner least likely to
+      # be tested locally for a path like this.
       - name: Rules-only install
         shell: bash
         run: |
           set -euo pipefail
-          python -m venv /tmp/rulesonly
-          /tmp/rulesonly/bin/pip install --quiet .
-          /tmp/rulesonly/bin/python -m syrth.classifier.export --help > /dev/null
-          /tmp/rulesonly/bin/python -c "import numpy" 2>/dev/null && \
-            { echo "numpy leaked into a rules-only install"; exit 1; } || true
+          python -m venv venv-rulesonly
+          if [ -x venv-rulesonly/bin/python ]; then
+            PY=venv-rulesonly/bin/python
+          else
+            PY=venv-rulesonly/Scripts/python.exe
+          fi
+          "$PY" -m pip install --quiet .
+          "$PY" -m syrth.classifier.export --help > /dev/null
+          if "$PY" -c "import numpy" 2>/dev/null; then
+            echo "numpy leaked into a rules-only install"
+            exit 1
+          fi
+          rm -rf venv-rulesonly
+          echo "rules-only install is clean"
 
   build:
     # The wheel and sdist are built from the tagged commit, once, so a release can

@@ -122,6 +122,7 @@ syrth_codebert/
 
 # --- Scratch space used by the external patch backend ---
 .syrth-patch/
+venv-rulesonly/
 
 # --- Local scratch work ---
 # One-off analysis scripts and the outputs of the retired v1 pipeline. Kept on
