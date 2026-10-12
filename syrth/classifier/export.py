@@ -49,10 +49,16 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..features import FEATURE_NAMES
-from .xgboost import CWE_CLASSES, XGBoostClassifier
+
+# Imported lazily inside main(). This module only needs numpy in order to read
+# a trained bundle, and a rules-only install has no numpy; an eager import made
+from .classes import CWE_CLASSES
+
+if TYPE_CHECKING:
+    from .xgboost import XGBoostClassifier
 
 #: Refuse to emit a header larger than this. A 22 MB header is not a build
 #: artefact, it is a sign the model needs quantisation or pruning first.
@@ -486,6 +492,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        # Imported here rather than at module scope: only reading a trained
+        # bundle needs numpy, and a rules-only install has none.
+        from .xgboost import XGBoostClassifier
+
         classifier = XGBoostClassifier(model_path=args.model)
         names = None
         if args.features and os.path.exists(args.features):

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.1 -- 2026-10-12
+
+### Fixed
+
+`syrth.classifier.export` could not be imported on a rules-only install. It named
+the class labels a model is trained against, and those labels lived in
+`syrth.classifier.xgboost`, which imports numpy at module scope -- so
+`pyproject.toml` promising two runtime dependencies was true for the scanner and
+false for the exporter. On the published 1.0.0 wheel, `python -m
+syrth.classifier.export --help` raised `ModuleNotFoundError` before printing
+anything.
+
+The labels moved to `syrth/classifier/classes.py`, which has no numerical
+dependency, and the model import is now deferred into `main()` where it is
+actually used. The scanner path was never affected: it imports nothing from either
+module.
+
+`TestRulesOnlyInstallHasNoNumericalStack` runs a subprocess with numpy masked, so
+the claim is checked rather than asserted. Found by installing the published wheel
+into a clean virtualenv, which no test had done before.
+
 ## 1.0.0 -- 2026-10-08
 
 ### Changed — the product definition

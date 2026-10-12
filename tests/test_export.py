@@ -13,6 +13,7 @@ minutes and why the exporter now enforces a size limit.
 
 from __future__ import annotations
 
+import pathlib
 import re
 import shutil
 import subprocess
@@ -341,3 +342,48 @@ int main(void) {{
         compiled = self._compile_and_run(header, features)
         expected = int(np.argmax(trained.model.predict_proba(features.reshape(1, -1))[0]))
         assert compiled == expected
+
+
+class TestRulesOnlyInstallHasNoNumericalStack:
+    """A rules-only install must not import numpy where it does not need one.
+
+    ``syrth.classifier.export`` names the class labels a model is trained against,
+    and those labels lived in :mod:`syrth.classifier.xgboost`, which imports numpy
+    at module scope. So ``pyproject.toml`` promising two runtime dependencies was
+    true for the scanner and false for the exporter: on the published 1.0.0 wheel
+    the exporter raised ``ModuleNotFoundError`` before it could print ``--help``.
+
+    The check runs in a subprocess with numpy masked, because this process has it.
+    """
+
+    def test_exporter_imports_without_numpy(self):
+        import subprocess
+        import sys
+        import textwrap
+
+        script = textwrap.dedent(
+            """
+            import sys
+
+            class Block:
+                def find_module(self, name, path=None):
+                    if name == "numpy" or name.startswith("numpy."):
+                        return self
+                    return None
+
+                def load_module(self, name):
+                    raise ImportError("numpy is blocked for this test")
+
+            sys.meta_path.insert(0, Block())
+            sys.path.insert(0, %r)
+            from syrth.classifier.export import CWE_CLASSES, export_c_header
+            assert CWE_CLASSES, "the exporter needs its class labels at import time"
+            print("ok")
+            """
+        ) % str(pathlib.Path(__file__).resolve().parents[1])
+        result = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True,
+        )
+        assert "ok" in result.stdout, (
+            "the exporter cannot be imported without numpy:\n" + result.stderr
+        )

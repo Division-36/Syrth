@@ -128,7 +128,7 @@ full per-class matrix and the methodology are in
 syrth/        the analyser: parser, taint, registry, guards, reporting
 benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
-tests/        631 tests
+tests/        632 tests
 docs/         the contract, the measurements, and their limits
 legacy/       why the retired v1 pipeline was deleted, and how to check the audit
 experiments/  scratch space; the v1 scripts that were here are gone

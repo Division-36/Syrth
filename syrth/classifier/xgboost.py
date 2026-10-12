@@ -37,11 +37,15 @@ from typing import Any
 import numpy as np
 
 from ..features.extractor import FEATURE_NAMES, FEATURE_SCHEMA_VERSION, NUM_FEATURES
-from ..registry import CATEGORIES, CATEGORY_CWE
+from ..registry import CATEGORIES
 
 #: Canonical prediction order. Generated from the category table so the label
 #: space can never drift from the registry.
-CWE_CLASSES: list[str] = [CATEGORY_CWE[category] for category in CATEGORIES]
+#: The ordered class labels a model is trained against. Re-exported from
+#: :mod:`syrth.classifier.classes` so that the C exporter can name them
+#: without importing numpy, which this module needs and that code does not.
+from .classes import CWE_CLASSES  # noqa: F401
+
 CWE_TO_INDEX: dict[str, int] = {cwe: i for i, cwe in enumerate(CWE_CLASSES)}
 
 #: Model hyper-parameters. Chosen for CPU-only, small-data, many-class operation:
