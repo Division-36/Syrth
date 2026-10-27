@@ -1,0 +1,78 @@
+{
+  "started": "2026-10-04T22:58:21Z",
+  "advisories_seen": 4737,
+  "advisories_in_scope": 704,
+  "repos_cloned": 40,
+  "commits_inspected": 447,
+  "candidates": 686,
+  "accepted_positive": 175,
+  "accepted_negative": 175,
+  "rejected_no_sink": 169,
+  "rejected_no_change": 1507,
+  "rejected_unparseable": 0,
+  "rejected_out_of_scope": 0,
+  "deduplicated": 16,
+  "direct_sink": 0,
+  "module_proximity": 0,
+  "evidence_tiers": {
+    "module-proximity": 108,
+    "direct-sink": 67
+  },
+  "classes_covered": [
+    "CWE-22",
+    "CWE-327",
+    "CWE-502",
+    "CWE-601",
+    "CWE-79",
+    "CWE-89",
+    "CWE-94"
+  ],
+  "repos_covered": {
+    "aiohttp": 6,
+    "ansible": 4,
+    "apache-airflow": 37,
+    "cherrypy": 1,
+    "django": 47,
+    "ipython": 3,
+    "joblib": 1,
+    "keras": 13,
+    "langchain": 4,
+    "llama-index": 7,
+    "mistune": 2,
+    "notebook": 3,
+    "paramiko": 1,
+    "pillow": 4,
+    "pip": 1,
+    "pyramid": 1,
+    "salt": 15,
+    "setuptools": 1,
+    "sqlalchemy": 12,
+    "starlette": 1,
+    "tornado": 1,
+    "transformers": 7,
+    "twisted": 2,
+    "werkzeug": 1
+  },
+  "rate": {
+    "limit": 5000,
+    "remaining": 5000,
+    "used": 0,
+    "exhausted": false
+  },
+  "errors": [
+    {
+      "url": "https://api.github.com/repos/theorchard/openpyxl",
+      "error": "HTTP 404"
+    }
+  ],
+  "skipped": {
+    "mlflow:1455MB": "over 750MB cap",
+    "streamlit:1125MB": "over 750MB cap",
+    "ray:792MB": "over 750MB cap",
+    "tensorflow:1359MB": "over 750MB cap",
+    "dagster:1457MB": "over 750MB cap",
+    "openpyxl:no-size": "size lookup failed",
+    "torch:1588MB": "over 750MB cap"
+  },
+  "generated": "2026-10-04T23:06:00Z"
+}
