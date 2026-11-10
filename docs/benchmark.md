@@ -26,7 +26,7 @@ result is published next to the documentation that quotes it.
 
 | figure | command | published file |
 |---|---|---|
-| category coverage, rank agreement, rename invariance, kill rate, determinism | `python -m benchmarks.run_benchmarks --dataset data/corpus.jsonl` | `data/risk_benchmark.json` |
+| category coverage, rank agreement, rename invariance, kill rate, determinism | `python -m benchmarks.risk_metrics --dataset data/corpus.jsonl` | `data/risk_benchmark.json` |
 | the Bandit, Semgrep and Ruff rows | `python -m benchmarks.competitors --dataset data/corpus.jsonl` | `data/competitor_benchmark.json` |
 | certificate identity under renaming | `python -m benchmarks.identity --dataset data/corpus.jsonl` | `data/identity_rename.json` |
 | the component ablation | `python -m benchmarks.ablation --dataset data/corpus.jsonl` | `data/ablation.json` |
@@ -38,6 +38,11 @@ The whole-repository replay needs the repositories checked out under
 corpus itself is rebuilt from pinned coordinates by `python tools/build_corpus.py`
 and is not committed, because it is third-party source under mixed licences;
 `python tools/freeze_corpus.py` produces a checksummed archive of it.
+
+`make verify-published` re-runs every command in the table and compares the
+result with the published file, field by field. It exits non-zero when a
+published number no longer matches its harness, and it names the fields it
+does not compare rather than ignoring them quietly.
 
 ### How ground truth is derived
 

@@ -4,6 +4,19 @@ SYRTH Benchmark Harness
 Measures the analyser's behaviour on a labelled corpus, and refuses to report a
 number it cannot justify.
 
+.. warning::
+
+   This is the **v1 classifier-era harness**, and the numbers it reports are
+   the ones that were withdrawn. They describe a tool that emitted verdicts on
+   a corpus with no reliable negative class, and they are not published: see
+   ``docs/withdrawn-v1.md`` for what was withdrawn and why.
+
+   The contract measurements this project publishes -- category coverage, rank
+   agreement, rename invariance, kill rate and determinism -- come from
+   :mod:`benchmarks.risk_metrics`. Nothing in this module's output should be
+   quoted; the module is still here because the other harnesses import its
+   corpus loading, its renamer and its record type.
+
 What this harness reports, and why each number matters
 ------------------------------------------------------
 **Precision and recall, not accuracy.** The corpus is dominated by safe code, so
@@ -871,7 +884,13 @@ def split(
 
 def render(metrics: Metrics) -> str:
     """Human-readable report."""
-    lines = ["=" * 72, "SYRTH benchmark", "=" * 72]
+    lines = [
+        "=" * 72,
+        "SYRTH benchmark (v1 harness -- WITHDRAWN METRICS, DO NOT QUOTE)",
+        "=" * 72,
+        "The contract measurements are in benchmarks.risk_metrics;",
+        "see docs/withdrawn-v1.md for what was withdrawn and why.",
+    ]
     support = metrics.support
     lines.append(
         "records {records} (unsafe {unsafe}, safe {safe}) -> reported {reported}".format(
@@ -909,8 +928,8 @@ def render(metrics: Metrics) -> str:
             lines.append(f"  - {warning}")
     lines.append("")
     lines.append(
-        "Quote precision, selectivity and the invariance and kill-rate figures. "
-        "Do not quote accuracy on a corpus that is mostly safe code."
+        "These figures were withdrawn and are not published. The published "
+        "measurements come from benchmarks.risk_metrics."
     )
     lines.append("")
     return "\n".join(lines)

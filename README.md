@@ -141,13 +141,16 @@ per-function study — so the per-function numbers are a floor rather than a
 substitute. Method, denominators and caveats are in
 [docs/benchmark.md](docs/benchmark.md).
 
+Every published number is re-derivable: `make verify-published` runs each
+harness again and compares the result with the file the documentation quotes.
+
 ## Repository layout
 
 ```
 syrth/        the analyser: parser, taint, registry, guards, reporting
 benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
-tests/        627 tests
+tests/        641 tests
 docs/         the contract, the measurements, and their limits
 data/         the published measurement files the documentation quotes
 RLTESTS/      smoke-test fixtures: deliberately vulnerable modules

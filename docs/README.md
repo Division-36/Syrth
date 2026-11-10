@@ -47,14 +47,14 @@ Nothing is hidden for being unlikely. See [risk-model.md](risk-model.md).
 
 ## Status
 
-627 tests; how many pass depends on the environment: the export test skips
+641 tests; how many pass depends on the environment: the export test skips
 without a C compiler (`gcc` on Linux runs it instead), and the measurement-table
 and freeze tests skip without `data/corpus.jsonl`, which CI does not generate.
 `ruff check syrth tests benchmarks tools` is clean. CI runs the suite on Ubuntu,
 Windows and macOS at Python 3.10 and 3.12.
 
 Current measured figures, reproduced by
-`python -m benchmarks.run_benchmarks` on `data/corpus.jsonl`:
+`python -m benchmarks.risk_metrics` on `data/corpus.jsonl`:
 
 | metric | value |
 |---|---|
@@ -70,7 +70,8 @@ Current measured figures, reproduced by
 
 Every number here is produced by a named harness and published next to the
 documentation that quotes it; [benchmark.md](benchmark.md) lists the command and
-the file behind each one.
+the file behind each one, and `make verify-published` re-derives them all and
+compares them with what is published.
 
 There is **no published accuracy figure**, because no accuracy claim is made. See
 [risk-model.md](risk-model.md) for why precision and recall do not apply here.

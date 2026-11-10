@@ -46,7 +46,10 @@ publishes.
   is no longer published, and `v1-prod` replaces them. No code change requires a
   migration: the CLI, the Python API and the rule set are unchanged.
 
-## Unreleased
+## v1.1-measurement — 2026-11-10
+
+The measurement evidence release: the four patch and identity studies, the
+whole-repository replay, and the analyser fix that made the replay possible.
 
 ### Added
 
@@ -69,6 +72,11 @@ publishes.
 - `tools/freeze_corpus.py` produces a byte-reproducible archive of the 350
   corpus records with a manifest and a checksum file, so a result can be pinned
   by a hash without publishing third-party source.
+- `benchmarks/verify_published.py` re-derives every published measurement with
+  the command the documentation prints and compares it with the published
+  file, field by field. `make verify-published` is the gate; CI checks the
+  published files' completeness and internal invariants, because CI does not
+  generate the corpus.
 
 ### Changed
 
@@ -83,11 +91,15 @@ publishes.
 - `syrth.parser.python.parameter_is_source` is a single documented seam that
   lets the ablation harness disable the position-seeded source rule without
   editing the analyser. Nothing in the product overrides it.
-- The documentation quotes 627 tests, states that skips are
+- The documentation quotes 641 tests, states that skips are
   environment-dependent, and adds a whole-repository section to
   [benchmark.md](benchmark.md).
 - The paper sources are excluded from the tree: the manuscript is a separate
   artefact with its own history and submission state.
+- The v1 classifier-era harness now says so in its own output. Its metrics
+  were withdrawn and are not published; the banner points at
+  `benchmarks.risk_metrics`, which produces the measurements this project does
+  publish.
 
 ### Known limitations
 

@@ -8,6 +8,16 @@
 #   make competitors  SYRTH against Bandit and Semgrep on the same corpus
 #   make corpus       rebuild the corpus from advisories (slow, checkpointed)
 #
+# The studies that produced the published numbers, each of which writes the
+# file the documentation quotes:
+#
+#   make patch-study    what a real fix commit does to a certificate
+#   make ablation       which analysis decision each number depends on
+#   make identity       certificate identity under renaming
+#   make whole-repo     the same patch study over full working trees (hours)
+#
+#   make verify-published   re-derive every published number and compare it
+#
 # Runtime dependencies are tree-sitter and tree-sitter-python, both declared in
 # pyproject.toml. Everything else is an extra:
 #
@@ -21,10 +31,12 @@ FILE ?=
 
 .PHONY: help install install-dev install-benchmark test test-verbose lint \
         check scan scan-json scan-sarif fix diff bench competitors corpus \
+        patch-study ablation identity whole-repo verify-published \
         train export-smoke docs-check build clean clean-windows
 
 help:
 	@echo "make check | test | lint | scan FILE= | bench | competitors | corpus"
+	@echo "make patch-study | ablation | identity | whole-repo | verify-published"
 
 install:
 	$(PYTHON) -m pip install -e .
@@ -78,6 +90,36 @@ competitors:
 # resumes from where it stopped rather than starting over.
 corpus:
 	$(PYTHON) tools/build_corpus.py --out $(DATASET)
+
+# The real-commit patch study: what a developer's fix does to the certificate
+# the advisory is about.
+patch-study:
+	$(PYTHON) -m benchmarks.patch_study --dataset $(DATASET) \
+		--json data/patch_study.json
+
+# Which analysis decision each published number depends on.
+ablation:
+	$(PYTHON) -m benchmarks.ablation --dataset $(DATASET) \
+		--json data/ablation.json
+
+# Certificate identity under renaming.
+identity:
+	$(PYTHON) -m benchmarks.identity --dataset $(DATASET) \
+		--json data/identity_rename.json
+
+# The same patch study over full working trees: every fix commit, both
+# revisions, 24 repositories. Needs the repositories under
+# experiments/scratch/repos and takes hours. Results are checkpointed per
+# commit, so an interrupted run resumes where it stopped.
+whole-repo:
+	$(PYTHON) -m benchmarks.whole_repo_study --dataset $(DATASET) \
+		--repos experiments/scratch/repos \
+		--json data/whole_repo_study.json
+
+# Re-derive every published number and compare it with what is published.
+# Exits non-zero when a published file no longer matches its harness.
+verify-published:
+	$(PYTHON) -m benchmarks.verify_published --dataset $(DATASET)
 
 train:
 	$(PYTHON) -m syrth.train --dataset $(DATASET)
