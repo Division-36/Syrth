@@ -115,6 +115,49 @@ class TestScanSource:
         )
         assert report.cross_function == []
 
+    def test_interprocedural_cycle_terminates_and_recovers_a_real_path(self, scanner):
+        """Mutual recursion must not overflow the chain walk.
+
+        ``entry`` walks into a cycle before it reaches ``run``. The walk has
+        to survive the dead branch and still return the real invocation path;
+        stopping at the first recursion would lose an edge the graph holds.
+        """
+        report = scanner.scan_source(
+            "import os\n"
+            "def a(x):\n"
+            "    return b(x)\n"
+            "def b(x):\n"
+            "    return a(x)\n"
+            "def run(cmd):\n"
+            "    return os.system(cmd)\n"
+            "def entry(request):\n"
+            '    a(request.GET["c"])\n'
+            '    return run(request.GET["d"])\n',
+            "app.py",
+        )
+        flows = [f for f in report.cross_function if f.sink == "EXEC_COMMAND"]
+        assert flows
+        assert flows[0].chain == ("entry", "run")
+
+    def test_interprocedural_external_argument_names_the_caller_as_entry(self, scanner):
+        """A read inside the caller must not leak a placeholder into provenance.
+
+        ``input()`` arrives at ``run`` from ``entry``. Crediting the caller is
+        what lets the composed trace name a real function; a bare marker would
+        be indexed into the summary table and crash the whole scan.
+        """
+        report = scanner.scan_source(
+            "import os\n"
+            "def run(cmd):\n"
+            "    return os.system(cmd)\n"
+            "def entry():\n"
+            "    return run(input())\n",
+            "app.py",
+        )
+        flows = [f for f in report.cross_function if f.sink == "EXEC_COMMAND"]
+        assert flows
+        assert flows[0].chain == ("entry", "run")
+
 
 class TestReportPolicy:
     """The risk model reports every sink contact with a likelihood.

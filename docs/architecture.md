@@ -142,6 +142,13 @@ called looks identical to a helper reached from every HTTP handler. With it:
 The fixed point is monotone over finite sets, so it terminates; recursion is
 handled by the iteration bound, which is asserted in the test suite.
 
+Composition is grouped by entry point. One breadth-first parent tree per entry
+recovers the path to every sink that entry reaches, so a dense repository graph
+is walked once per entry rather than once per emitted certificate. The tree is
+the same traversal the per-certificate search used---a node's first discovery is
+its parent---so the reported chains are identical; only the repeated work is
+gone.
+
 ### 5. Traces — `syrth/trace.py`
 
 The certificate. `trace_id` is a hash of the flow's *structure* — function,

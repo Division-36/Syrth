@@ -142,6 +142,18 @@ _LITERAL_NODES = frozenset(
 )
 
 
+def parameter_is_source(name: str) -> bool:
+    """Whether a function parameter is treated as an external origin.
+
+    ``True`` for every name by default, which is what makes the reported class
+    set survive renaming: the analyser never asks what a parameter is called.
+    The function exists as a single seam so a benchmark can ablate the rule
+    without editing the analyser; see ``benchmarks/ablation.py``. Nothing in the
+    product overrides it.
+    """
+    return True
+
+
 @dataclass
 class _CallArg:
     """One resolved argument of a call, with its position."""
@@ -548,6 +560,8 @@ class PythonParser(BaseParser):
                                   arg_name),
                     ),
                 )
+                continue
+            if not parameter_is_source(arg_name):
                 continue
             self._values[arg_name] = TaintValue(
                 origins=frozenset({param_origin(index)}),

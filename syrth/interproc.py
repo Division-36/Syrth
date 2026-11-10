@@ -38,6 +38,7 @@ because the taint sets only ever grow and are finite.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
@@ -156,6 +157,12 @@ class CallGraph:
         self.iterations: int = 0
         #: Tainted parameters per function, filled in by :meth:`propagate`.
         self.tainted: dict[str, set[int]] = {}
+        #: Resolved call names, cached as ``call name -> qualified name``.
+        #: The summary table does not change after :meth:`build`, and without
+        #: this cache every unresolved call rescans every summary once.
+        self._resolve_memo: dict[str, str | None] = {}
+        #: Last-segment index over :attr:`summaries`, built on first use.
+        self._tail_index: dict[str, str] | None = None
         #: ``{function: {parameter index: responsible entry points}}``.
         self.provenance: dict[str, dict[int, set[str]]] = {}
 
@@ -208,6 +215,8 @@ class CallGraph:
             existing = self.summaries.get(qualname)
             if existing is None:
                 self.summaries[qualname] = summary
+                self._tail_index = None
+                self._resolve_memo.clear()
             else:
                 # Two definitions with one name (a conditional redefinition, or a
                 # stub plus an implementation). Merge rather than silently drop
@@ -252,15 +261,22 @@ class CallGraph:
 
     def resolve(self, call_name: str) -> str | None:
         """Resolve a call name to a known function, honouring ``self``/``cls``."""
-        if call_name in self.summaries:
-            return call_name
+        if call_name in self._resolve_memo:
+            return self._resolve_memo[call_name]
+        if self._tail_index is None:
+            index: dict[str, str] = {}
+            for qualname in sorted(self.summaries):
+                index.setdefault(qualname.rpartition(".")[2], qualname)
+            self._tail_index = index
         tail = call_name.rpartition(".")[2]
-        if tail in self.summaries:
-            return tail
-        for qualname in sorted(self.summaries):
-            if qualname.rpartition(".")[2] == tail:
-                return qualname
-        return None
+        if call_name in self.summaries:
+            resolved: str | None = call_name
+        elif tail in self.summaries:
+            resolved = tail
+        else:
+            resolved = self._tail_index.get(tail)
+        self._resolve_memo[call_name] = resolved
+        return resolved
 
     # ----------------------------------------------------------- fixed point
     def propagate(self) -> dict[str, set[int]]:
@@ -293,8 +309,6 @@ class CallGraph:
             for name in sorted(self.summaries):
                 caller = self.summaries[name]
                 caller_tainted = tainted.get(name, set())
-                if not caller_tainted:
-                    continue
                 for callee_name, _line, arg_origins, arg_slots in caller.invocations:
                     target = self.resolve(callee_name)
                     if target is None:
@@ -313,7 +327,10 @@ class CallGraph:
                             # reachable through it.
                             for position_index in range(target_summary.param_count):
                                 sources |= _origin_sources(
-                                    origins, caller_tainted, provenance.get(name, {})
+                                    origins,
+                                    caller_tainted,
+                                    provenance.get(name, {}),
+                                    name,
                                 )
                                 if sources:
                                     incoming.add(position_index)
@@ -324,12 +341,12 @@ class CallGraph:
                         if not _origins_reach_taint(origins, caller_tainted):
                             continue
                         sources = _origin_sources(
-                            origins, caller_tainted, provenance.get(name, {})
+                            origins, caller_tainted, provenance.get(name, {}), name
                         )
                         if not sources:
-                            # The argument carries a self-seeded external origin
-                            # (a request object, the environment). The caller is
-                            # then itself the entry point for this flow.
+                            # An argument with no symbolic origin at all still
+                            # reaches the callee from this caller, so the caller
+                            # is the entry point for the flow.
                             sources = {name}
                         incoming.add(index)
                         incoming_sources.setdefault(index, set()).update(sources)
@@ -359,7 +376,15 @@ class CallGraph:
         """
         self.propagate()
         provenance = self.provenance
-        emitted: list[CrossFunctionTrace] = []
+        # Group emissions by entry point before composing. Each composed trace
+        # needs a path from its entry to its sink, and a repository graph can
+        # have hundreds of thousands of (entry, sink) pairs. Building one BFS
+        # tree per entry and reusing it for every sink that entry reaches turns
+        # that from one graph walk per emission into one walk per entry, without
+        # changing which path is reported: the tree is the same breadth-first
+        # traversal the per-emission search used, and a node's first discovery
+        # is its parent either way.
+        pending: dict[str, list[tuple[str, str, tuple[int, ...]]]] = {}
 
         for sink_fn in sorted(self.summaries):
             summary = self.summaries[sink_fn]
@@ -375,23 +400,79 @@ class CallGraph:
                         for entry in provenance.get(sink_fn, {}).get(index, set()):
                             responsible.setdefault(entry, set()).add(index)
                     for entry in sorted(responsible):
-                        emitted.append(
-                            self._compose(
-                                entry, sink_fn, sink, sorted(responsible[entry])
-                            )
+                        pending.setdefault(entry, []).append(
+                            (sink_fn, sink, tuple(sorted(responsible[entry])))
                         )
                     continue
                 if not params and summary.self_origins:
                     # The flow is seeded inside this function by an external
                     # read (a request object, the environment, stdin) rather than
                     # by a tainted parameter, so the function is its own entry.
-                    emitted.append(self._compose(sink_fn, sink_fn, sink, []))
+                    pending.setdefault(sink_fn, []).append((sink_fn, sink, ()))
+
+        emitted: list[CrossFunctionTrace] = []
+        for entry in sorted(pending):
+            parents = self._bfs_tree(entry)
+            for sink_fn, sink, params in pending[entry]:
+                chain = self._chain_from(entry, sink_fn, parents)
+                emitted.append(self._compose(entry, sink_fn, sink, params, chain))
 
         emitted.sort(key=lambda t: (t.entry_file, t.entry_line, t.sink, t.trace_id))
         return emitted
 
+    def _bfs_tree(self, entry: str) -> dict[str, str | None]:
+        """Breadth-first parent map from ``entry`` to every reachable node.
+
+        The traversal is cycle-safe (a node is expanded once) and deterministic
+        (invocations are visited in source order), so a node's parent is its
+        first-discovered predecessor. :meth:`_chain_from` reads a path out of
+        this map; sharing one map across every sink an entry reaches is what
+        keeps a dense repository graph tractable.
+        """
+        parents: dict[str, str | None] = {entry: None}
+        if entry not in self.summaries:
+            return parents
+        queue = deque([entry])
+        while queue:
+            node = queue.popleft()
+            summary = self.summaries.get(node)
+            if summary is None:
+                continue
+            for callee_name, _line, _origins, _slots in summary.invocations:
+                resolved = self.resolve(callee_name)
+                if resolved is None or resolved in parents:
+                    continue
+                parents[resolved] = node
+                queue.append(resolved)
+        return parents
+
+    def _chain_from(
+        self, entry: str, target: str, parents: Mapping[str, str | None]
+    ) -> list[str]:
+        """Recover the entry-to-target path recorded in a BFS parent map.
+
+        If the target is not in the map it returns the two-name display
+        approximation, never a chain the graph does not contain. Only
+        :meth:`_bfs_tree` can put a node in the map, so a mapped path is a real
+        sequence of invocations.
+        """
+        if entry == target:
+            return [entry]
+        if target not in parents:
+            return [entry, target]
+        path = [target]
+        while parents[path[-1]] is not None:
+            path.append(parents[path[-1]])  # type: ignore[arg-type]
+        path.reverse()
+        return path
+
     def _compose(
-        self, entry: str, sink_fn: str, sink: str, params: Sequence[int]
+        self,
+        entry: str,
+        sink_fn: str,
+        sink: str,
+        params: Sequence[int],
+        chain: Sequence[str],
     ) -> CrossFunctionTrace:
         """Build one composed trace from an entry point to a sink in ``sink_fn``."""
         entry_summary = self.summaries[entry]
@@ -410,7 +491,6 @@ class CallGraph:
                     target = candidate
                     break
 
-        chain = self._chain(entry, sink_fn)
         if target is None:
             cwe = ""
             category = ""
@@ -472,22 +552,6 @@ class CallGraph:
             confidence=round(confidence, 4),
         )
 
-    def _chain(self, entry: str, target: str) -> list[str]:
-        """Recover one concrete call path from ``entry`` to ``target``."""
-        if entry == target:
-            return [entry]
-        summary = self.summaries.get(entry)
-        if summary is None:
-            return [entry, target]
-        for callee_name, _line, _origins, _slots in summary.invocations:
-            resolved = self.resolve(callee_name)
-            if resolved is None:
-                continue
-            tail = self._chain(resolved, target)
-            if tail and tail[0] == resolved:
-                return [entry] + tail
-        return [entry, target]
-
 
 def _param_name(summary: FunctionSummary, index: int) -> str:
     """Best-effort display name for parameter ``index`` of a function."""
@@ -501,6 +565,7 @@ def _origin_sources(
     origins: Sequence[str],
     caller_tainted: set[int],
     caller_provenance: Mapping[int, set[str]],
+    caller: str,
 ) -> set[str]:
     """Entry points responsible for tainting an argument.
 
@@ -515,26 +580,8 @@ def _origin_sources(
             if index is not None and index in caller_tainted:
                 sources |= caller_provenance.get(index, set())
         elif origin and origin != Origin.GLOBAL:
-            sources.add("__external__")
+            sources.add(caller)
     return sources
-
-    def _chain(
-        self, entry: str, target: str, tainted: Mapping[str, set[int]]
-    ) -> list[str]:
-        """Recover one concrete call path from ``entry`` to ``target``."""
-        if entry == target:
-            return [entry]
-        summary = self.summaries.get(entry)
-        if summary is None:
-            return [target]
-        for callee_name, _line, _origins, _slots in summary.invocations:
-            resolved = self.resolve(callee_name)
-            if resolved is None:
-                continue
-            tail = self._chain(resolved, target, tainted)
-            if tail and tail[0] == resolved:
-                return [entry] + tail
-        return [entry, target]
 
 
 def _compose_id(entry: str, sink_fn: str, sink: str, params: Iterable[int]) -> str:
