@@ -64,6 +64,10 @@ data/*.json
 !data/competitor_benchmark.json
 !data/risk_benchmark.json
 !data/corpus_manifest.json
+!data/ablation.json
+!data/identity_rename.json
+!data/patch_study.json
+!data/whole_repo_study.json
 
 # Deliberately NOT published: data/benchmark.json. It reports precision, recall,
 # f1, false_positive_rate and abstention_rate, which are the measurements of the
@@ -114,6 +118,13 @@ venv-rulesonly/
 # One-off analysis scripts and the clone cache used to rebuild the corpus. Kept on
 # disk, never committed.
 experiments/scratch/
+
+# --- Paper sources ---
+# The manuscript lives beside the code it describes so the numbers in it can be
+# checked against data/ without leaving the tree, but it is a separate artefact
+# with its own history, submission state, and (once submitted) a venue's
+# anonymity rules. Tracked in its own repository, not this one.
+paper/
 
 # --- Editor / OS ---
 .vscode/

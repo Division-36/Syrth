@@ -1,0 +1,368 @@
+{
+  "dataset": "data/corpus.jsonl",
+  "threshold": 0.5,
+  "pairs": 175,
+  "examined": 175,
+  "unparseable": 0,
+  "flow_traced": 54,
+  "flow_persists": 46,
+  "flow_persists_partial": 3,
+  "flow_persists_new": 3,
+  "flow_removed": 7,
+  "flow_traded": 1,
+  "any_killed": 11,
+  "killed_pairs_all": 13,
+  "regression_any": 10,
+  "introduced_by_cwe": {
+    "CWE-22": 6,
+    "CWE-79": 3,
+    "CWE-94": 2
+  },
+  "by_cwe": {
+    "CWE-22": {
+      "traced": 28,
+      "persists": 23,
+      "removed": 4,
+      "traded": 1
+    },
+    "CWE-327": {},
+    "CWE-502": {
+      "traced": 6,
+      "persists": 6
+    },
+    "CWE-601": {
+      "traced": 4,
+      "persists": 4
+    },
+    "CWE-79": {
+      "traced": 9,
+      "persists": 8,
+      "removed": 1
+    },
+    "CWE-89": {
+      "traced": 1,
+      "persists": 1
+    },
+    "CWE-94": {
+      "traced": 6,
+      "persists": 4,
+      "removed": 2
+    }
+  },
+  "by_tier": {
+    "direct-sink": {
+      "traced": 53,
+      "persists": 45,
+      "removed": 7,
+      "traded": 1
+    },
+    "module-proximity": {
+      "traced": 1,
+      "persists": 1
+    }
+  },
+  "unnoticed": 43,
+  "notes": [
+    {
+      "pair_id": "GHSA-5h86-8mv2-jq9f:1c335944d6a8b1298baf179b7c0b3069f10c514b:aiohttp/web_urldispatcher.py:StaticResource._handle:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-jpvw-p8pr-9g2x:1e930684bc0a76ec3d094cd326738ad26416541c:lib/ansible/galaxy/role.py:GalaxyRole.install:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-3c67-gc48-983w:b2551bb6943eec078066aa3a923e0bb3ed85abe8:lib/ansible/galaxy/collection.py:CollectionRequirement.install:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 4,
+      "target_alive": 4
+    },
+    {
+      "pair_id": "GHSA-3c67-gc48-983w:b2551bb6943eec078066aa3a923e0bb3ed85abe8:lib/ansible/galaxy/collection.py:_extract_tar_file:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-c3c6-f2ww-xfr2:2c4c5bc604e9ab0cc1e98f7bee7d31d566579462:airflow/models/xcom.py:BaseXCom._deserialize_value:CWE-502",
+      "cwe": "CWE-502",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-pxch-wr7m-rwxj:0b995602e6e5894ee31625a4dd0e6aa255d2a651:airflow/www/views.py:Airflow.trigger:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 10,
+      "target_alive": 10
+    },
+    {
+      "pair_id": "GHSA-99cv-8cvv-666c:27a4a888e946728d9bb33b78ec604e08d4a93f89:airflow/www/views.py:dag_run_link:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-99cv-8cvv-666c:27a4a888e946728d9bb33b78ec604e08d4a93f89:airflow/www/views.py:label_link:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-99cv-8cvv-666c:27a4a888e946728d9bb33b78ec604e08d4a93f89:airflow/www/views.py:pool_link:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-99cv-8cvv-666c:27a4a888e946728d9bb33b78ec604e08d4a93f89:airflow/www_rbac/views.py:PoolModelView.pool_link:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-76x8-gg39-5jjg:37b856eba6f207231c691dae2e5b24e072f86664:cherrypy/lib/sessions.py:FileSession._get_file_path:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-8m3r-rv5g-fcpq:1966786d2dde73e17f39cf340eb33fcb5d73904e:django/contrib/admin/widgets.py:AdminFileWidget.render:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-jrh2-hc4r-7jwx:4cb35b384ceef52123fc66411a73c36a706825e1:django/core/files/storage.py:FileSystemStorage._save:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-rxjp-mfm9-w4wr:04ac1624bdc2fa737188401757cf95ced122d26d:django/core/files/storage.py:Storage.get_available_name:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-rxjp-mfm9-w4wr:04ac1624bdc2fa737188401757cf95ced122d26d:django/core/files/storage.py:Storage.generate_filename:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-4vwq-x64q-j4cj:3ab41641cf6fce3860c73d5cf4645aa12e1e5892:IPython/html/notebookapp.py:NotebookWebApplication.init_settings:CWE-79",
+      "cwe": "CWE-79",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-6hrg-qmvc-2xh8:b90f10efeb670a2cc877fb88ebb3f2019189e059:joblib/parallel.py:Parallel.__call__:CWE-94",
+      "cwe": "CWE-94",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-hjqc-jx6g-rwp9:47fcb397ee4caffd5a75efd1fa3067559594e951:keras/src/utils/file_utils.py:extract_archive:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-58hv-7753-xmfq:d338a45204bdc787c8b3c4a9b82c1911cd52dedf:keras/src/utils/file_utils.py:is_link_in_dir:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-2xxc-73fv-36f7:aa6726706476e0f957a8d57a5ca89e519e93bad7:llama_index/exec_utils.py:safe_eval:CWE-94",
+      "cwe": "CWE-94",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-2xxc-73fv-36f7:aa6726706476e0f957a8d57a5ca89e519e93bad7:llama_index/exec_utils.py:safe_exec:CWE-94",
+      "cwe": "CWE-94",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-rcx2-m7jp-p9wj:979e0bd15e794ceb00cc63737fcd5fd9addc4a99:notebook/auth/login.py:LoginHandler._redirect_safe:CWE-601",
+      "cwe": "CWE-601",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-rv62-4pmj-xw6h:08c4c898182edbe97aadef1815cce50448f975cb:notebook/auth/login.py:LoginHandler._redirect_safe:CWE-601",
+      "cwe": "CWE-601",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-rv62-4pmj-xw6h:70fe9f0ddb3023162ece21fbb77d5564306b913b:notebook/auth/login.py:LoginHandler._redirect_safe:CWE-601",
+      "cwe": "CWE-601",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-3f63-hfp8-52jq:45c726fd4daa63236a8f3653530f297dc87b160a:src/PIL/ImageMath.py:eval:CWE-94",
+      "cwe": "CWE-94",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-gpvv-69j7-gwj8:a4c735b14a62f9cb864533808ac63936704f2ace:src/pip/_internal/download.py:_download_http_url:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-8pcp-r83j-fc92:c4ad23f0f3132d8d8a88f19fa537dc42cf21b215:salt/master.py:AESFuncs._file_recv:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-r546-h3ff-q585:4b30218edf1a979855ea191d72b30c89f4a5a582:salt/utils/verify.py:clean_path:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-xh32-3m67-qjgf:f7c28ffbf18dbf693a15b1ba9493918de3e88cf3:salt/utils/gitfs.py:GitFS.find_file:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 3,
+      "target_alive": 3
+    },
+    {
+      "pair_id": "GHSA-xh32-3m67-qjgf:f7c28ffbf18dbf693a15b1ba9493918de3e88cf3:salt/utils/verify.py:clean_join:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-2qw3-2wv6-p64x:e0cdb80b55123f4a024759ffcf2b3f0e0788e7ab:salt/fileserver/roots.py:find_file:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-2qw3-2wv6-p64x:e0cdb80b55123f4a024759ffcf2b3f0e0788e7ab:salt/master.py:AESFuncs._syndic_return:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-5rjg-fvgr-3xxf:250a6d17978f9f6ac3ac887091f2d32886fbbb0b:setuptools/package_index.py:PackageIndex._resolve_download_filename:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-887w-45rq-vxgf:30307c4616ad67c01ddae2e1e8e34fabf6028414:lib/sqlalchemy/orm/session.py:Session.execute:CWE-89",
+      "cwe": "CWE-89",
+      "tier": "module-proximity",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-qj8w-rv5x-2v9h:1797de464124b090f10cf570441e8292936d63e3:starlette/staticfiles.py:StaticFiles.lookup_path:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-hj3f-6gcp-jg8j:32ad07c54e607839273b4e1819c347f5c8976b2f:tornado/web.py:StaticFileHandler.validate_absolute_path:CWE-601",
+      "cwe": "CWE-601",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-xrqw-3rrv-vx5w:eaaaf8494dd5386634ae37d1d122212fdc315be5:src/transformers/processing_utils.py:ProcessorMixin.save_pretrained:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 3,
+      "target_alive": 3
+    },
+    {
+      "pair_id": "GHSA-xrqw-3rrv-vx5w:eaaaf8494dd5386634ae37d1d122212fdc315be5:src/transformers/tokenization_utils_base.py:PreTrainedTokenizerBase.save_chat_templates:CWE-22",
+      "cwe": "CWE-22",
+      "tier": "direct-sink",
+      "target_traces": 3,
+      "target_alive": 3
+    },
+    {
+      "pair_id": "GHSA-69w3-r845-3855:03c8082ba4594c9b8d6fe190ca9bed0e5f8ca396:src/transformers/trainer.py:Trainer._load_rng_state:CWE-502",
+      "cwe": "CWE-502",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-v68g-wm8c-6x7j:1d63b0ec361e7a38f1339385e8a5a855085532ce:src/transformers/models/deprecated/transfo_xl/tokenization_transfo_xl.py:TransfoXLTokenizer.__init__:CWE-502",
+      "cwe": "CWE-502",
+      "tier": "direct-sink",
+      "target_traces": 2,
+      "target_alive": 2
+    },
+    {
+      "pair_id": "GHSA-v68g-wm8c-6x7j:1d63b0ec361e7a38f1339385e8a5a855085532ce:src/transformers/models/deprecated/transfo_xl/tokenization_transfo_xl.py:get_lm_corpus:CWE-502",
+      "cwe": "CWE-502",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-v68g-wm8c-6x7j:1d63b0ec361e7a38f1339385e8a5a855085532ce:src/transformers/models/rag/retrieval_rag.py:LegacyIndex._load_passages:CWE-502",
+      "cwe": "CWE-502",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    },
+    {
+      "pair_id": "GHSA-v68g-wm8c-6x7j:1d63b0ec361e7a38f1339385e8a5a855085532ce:src/transformers/models/rag/retrieval_rag.py:LegacyIndex._deserialize_index:CWE-502",
+      "cwe": "CWE-502",
+      "tier": "direct-sink",
+      "target_traces": 1,
+      "target_alive": 1
+    }
+  ]
+}
