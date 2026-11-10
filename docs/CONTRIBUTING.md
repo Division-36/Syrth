@@ -18,12 +18,13 @@ python -m ruff check syrth tests benchmarks
 Required before every hand-off:
 
 ```bash
-python -m pytest tests -q -o addopts=      # expect: 623 passed, 1 skipped
-python -m ruff check syrth tests benchmarks # expect: All checks passed!
+python -m pytest tests -q -o addopts=      # expect: all pass; skips are environment-dependent
+python -m ruff check syrth tests benchmarks tools # expect: All checks passed!
 ```
 
-The skip is the C-export test, which needs a C compiler. On a machine without one
-it is legitimately skipped — say so rather than reporting a clean run.
+The skips are environment-dependent: the C-export test needs a C compiler, and
+the measurement-table and freeze tests need `data/corpus.jsonl`, which CI does
+not generate. Skips are legitimate — say so rather than reporting a clean run.
 
 Do not claim a command passed unless you ran it and read the output.
 
@@ -37,7 +38,7 @@ Do not claim a command passed unless you ran it and read the output.
 | `syrth/scan.py` | scanner and CLI |
 | `syrth/patch.py` | patch backends and verification |
 | `benchmarks/` | the harness |
-| `tests/` | 624 tests |
+| `tests/` | 627 tests |
 
 ## House rules
 

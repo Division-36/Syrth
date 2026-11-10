@@ -64,6 +64,25 @@ output on every record, free names preserved). That is a result on this corpus,
 not a proof for all Python: the renamer covers the identifier shapes it was built
 to produce.
 
+## The measurement's scope
+
+**Extracting a function into a snippet loses context.** The corpus stores each
+record as the function it is about, with the module's imports and constants, so
+that a benchmark can run without the repository. The whole-repository replay
+measures what that costs: the snippet study traces the labelled class in 54
+pairs and the repository study in 57, and the two disagree on one pair's
+outcome. A snippet cannot see a helper defined elsewhere in the module, a
+module-level binding, or a flow that only exists once the module is parsed as a
+whole. The snippet study is therefore a lower bound, not a substitute.
+
+**Certificate identity is name-based.** A flow is tied to a function by name.
+In a large repository a common method name is defined many times — `start` is
+defined 172 times in salt at one revision — so matching a flow to a function by
+name alone can credit an unrelated function. The whole-repository study pins
+cross-function matches to the labelled file as well as the labelled name for
+exactly this reason. The certificate key itself carries the same scoping: two
+same-named functions with identical flow shapes produce the same `trace_id`.
+
 ## Patching
 
 **SQL cannot be patched.** Converting a concatenated query to a parameterised one

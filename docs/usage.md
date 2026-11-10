@@ -18,8 +18,8 @@ Verify:
 
 ```bash
 python -c "import syrth; print(syrth.__version__)"
-python -m pytest tests -q -o addopts=      # 623 passed, 1 skipped
-python -m ruff check syrth tests benchmarks
+python -m pytest tests -q -o addopts=      # all pass on a full checkout; skips are environment-dependent
+python -m ruff check syrth tests benchmarks tools
 ```
 
 ## Scan a repository

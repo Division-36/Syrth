@@ -105,8 +105,8 @@ Four caveats stated plainly, because the table is easy to misread:
 
 - **A `0/116` usually means "does not model this class", not "found nothing".**
   Bandit ships no open-redirect rule and Semgrep's two extra configs carry no rules
-  for the seven classes here. Where both tools do have a rule, Bandit wins one:
-  **14/15** against SYRTH's **15/15** on CWE-502.
+  for the seven classes here. Where both tools do have a rule, SYRTH is ahead by
+  one on CWE-502: **15/15** against Bandit's **14/15**.
 - **Ruff's `0/116` is a metadata gap.** It names 111 findings and none carries a
   CWE, so the class axis cannot score it. It is in the table because dropping it
   would flatter everyone else — and on the axis it *can* be scored on, it reaches
@@ -122,13 +122,32 @@ class, and each pair's patched side still contains its sink call by design. The
 full per-class matrix and the methodology are in
 [docs/benchmark.md](docs/benchmark.md#competitor-comparison).
 
+### What real fixes do to a certificate
+
+The corpus carries the real patched counterpart of every record, so the question a
+developer actually asks — *did the fix change the flow?* — can be asked by
+matching certificates rather than line numbers.
+
+| Study | Result |
+|---|---|
+| real-commit patch study, per function | 54 of 175 pairs trace the labelled class: 46 persist, 7 removed, 1 traded |
+| whole-repository replay, 88 fix commits in 24 repositories | 57 of 175 pairs trace it: 50 persist, 6 removed, 1 traded |
+| cross-function certificates reaching the same sink | 23 pairs; 4,268 of 4,275 keep the same identity |
+
+A fix that only adds a guard leaves the certificate standing, by design: that is
+what lets a verifier refuse the patch instead of approving it on trust. The
+replay finds flows the extracted snippet cannot see — 3 more pairs than the
+per-function study — so the per-function numbers are a floor rather than a
+substitute. Method, denominators and caveats are in
+[docs/benchmark.md](docs/benchmark.md).
+
 ## Repository layout
 
 ```
 syrth/        the analyser: parser, taint, registry, guards, reporting
 benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
-tests/        624 tests
+tests/        627 tests
 docs/         the contract, the measurements, and their limits
 data/         the published measurement files the documentation quotes
 RLTESTS/      smoke-test fixtures: deliberately vulnerable modules
