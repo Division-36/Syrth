@@ -71,12 +71,21 @@ The prompt contains, verbatim:
 The prompt **must not** contain, in whole or in part:
 
 * the patched side of the corpus record (the real upstream fix);
-* the advisory identifier, the commit hash, or the repository name.
+* the advisory identifier or the commit hash, anywhere in the prompt;
+* the repository name, in the prompt's instructions.
+
+The repository name may appear *inside the vulnerable source*, because the
+source is the code under repair and its own imports name the project — a
+Django module says "django". Removing it would mean editing the code the
+model is asked to fix, so it stays, and it is part of the memorisation
+confound below.
 
 The harness enforces this mechanically: it builds the prompt from the
-vulnerable record and the certificate only, and a test asserts that no
-substring of the patched source appears in any prompt, and that the advisory
-and commit identifiers do not appear either.
+vulnerable record and the certificate only, and refuses to write a prompt
+that contains a line of the patched side that the vulnerable side does not
+already have. Lines are compared whole, after whitespace normalisation, so
+that indentation cannot hide a shared line and a shared line is not mistaken
+for the fix.
 
 **Known confound, stated in advance:** the corpus is public, the repositories
 are famous, and the upstream fixes are public. A model with pretraining
@@ -98,6 +107,10 @@ fix", not as "the model repaired a vulnerability".
   responses, and treats the published responses — not the model — as the
   artefact of record. Verification can be re-run from the published
   responses without the model.
+  The responses embed the corpus's third-party source, so they are not
+  committed to the repository: they travel in the frozen, checksummed archive
+  beside the corpus, and the repository publishes the results derived from
+  them.
 * One attempt per pair is the primary analysis. A second attempt per pair is
   a robustness check on self-consistency; it is reported separately and does
   not enter the primary rate. If it is not run, that is recorded here as a
@@ -169,4 +182,5 @@ and whether it was decided before or after the affected numbers were read.
 
 | date | deviation | decided |
 |---|---|---|
+| 2026-11-11 | The rule "the prompt must not contain the repository name" was narrowed to "the prompt's instructions must not contain it". The vulnerable source of several pairs names its own project (`django`, `keras`), and removing the name would mean editing the code the model is asked to fix. The advisory identifier and the commit hash are still excluded from the whole prompt, and a line of the patched side is still excluded from the whole prompt. The guard compares whole lines after whitespace normalisation, so indentation cannot hide a shared line and a shared line is not mistaken for the fix. | before any attempt was run |
 | — | none yet | — |

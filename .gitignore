@@ -68,6 +68,10 @@ data/*.json
 !data/identity_rename.json
 !data/patch_study.json
 !data/whole_repo_study.json
+# The repair experiment's results, without the third-party source they were
+# produced from: the prompts and the responses embed corpus code and stay in
+# the frozen archive.
+!data/llm_patch.json
 
 # Deliberately NOT published: data/benchmark.json. It reports precision, recall,
 # f1, false_positive_rate and abstention_rate, which are the measurements of the
