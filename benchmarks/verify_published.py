@@ -375,6 +375,17 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "flow_traded",
         "missing_pairs",
     ),
+    "data/llm_patch.json": (
+        "dataset",
+        "population",
+        "attempted",
+        "parsed",
+        "verified_kill",
+        "guard_only",
+        "new_flow",
+        "rates",
+        "results",
+    ),
 }
 
 

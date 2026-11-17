@@ -37,6 +37,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import datetime
 import difflib
 import json
 import pathlib
@@ -48,6 +49,12 @@ from typing import Any
 
 from benchmarks.run_benchmarks import load_records
 from syrth.scan import SyrthScanner
+
+#: Which generator produced the answers. It is recorded with every attempt
+#: because it is not a fixed public checkpoint: the answers, not the model,
+#: are the artefact of record.
+MODEL_IDENTIFIER = "minimax-m3.1-flash-free"
+MODEL_PROVIDER = "opencode"
 
 #: The whole-repository results, used to widen the population to the pairs
 #: whose flow is confirmed only when the module is scanned whole.
@@ -501,13 +508,59 @@ def verify(dataset: str, responses: str, output: str) -> int:
     return 0
 
 
+def collect(manifest_path: str, answers_dir: str, output: str, agent: str) -> int:
+    """Turn the recorded answer files into the responses the verifier reads.
+
+    The answers are files, one per pair, written by whatever produced them.
+    Collecting them here keeps the metadata -- which model, which provider,
+    which date -- in one place, and records the pairs that have no answer, so
+    that a missing attempt is visible rather than silently absent.
+    """
+    manifest = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
+    directory = pathlib.Path(answers_dir)
+    date = datetime.date.today().isoformat()
+    rows: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for entry in manifest:
+        answer_path = directory / entry["answer"]
+        if not answer_path.exists():
+            missing.append(entry["index"])
+            continue
+        rows.append(
+            {
+                "pair_id": entry["pair_id"],
+                "response": answer_path.read_text(encoding="utf-8"),
+                "model": MODEL_IDENTIFIER,
+                "provider": MODEL_PROVIDER,
+                "agent": agent,
+                "date": date,
+                "attempt": 1,
+            }
+        )
+    path = pathlib.Path(output)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"pairs in the manifest                      : {len(manifest)}")
+    print(f"answers collected                          : {len(rows)}")
+    print(f"pairs with no answer                       : {len(missing)}")
+    if missing:
+        print(f"  missing indices                          : {', '.join(missing)}")
+    print(f"responses file                             : {output}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Certificate-verified patch repair."
     )
-    parser.add_argument("step", choices=("prepare", "verify"))
+    parser.add_argument("step", choices=("prepare", "collect", "verify"))
     parser.add_argument("--dataset", default="data/corpus.jsonl")
     parser.add_argument("--responses", default="data/llm_patch_responses.jsonl")
+    parser.add_argument("--manifest", default="experiments/scratch/llm-patch/manifest.json")
+    parser.add_argument("--answers-dir", default="experiments/scratch/llm-patch")
+    parser.add_argument("--agent", default="opencode subagent")
     parser.add_argument("--json", default=None)
     args = parser.parse_args(argv)
 
@@ -515,6 +568,10 @@ def main(argv: list[str] | None = None) -> int:
         if not args.json:
             parser.error("--json is required for prepare")
         return prepare(args.dataset, args.json)
+    if args.step == "collect":
+        if not args.json:
+            parser.error("--json is required for collect")
+        return collect(args.manifest, args.answers_dir, args.json, args.agent)
     if not args.json:
         parser.error("--json is required for verify")
     return verify(args.dataset, args.responses, args.json)

@@ -517,4 +517,32 @@ cross-function counts, the patched-file check, and the repo-wide introduced
 count; the top level records the partition and the by-class, by-repository, and
 by-tier splits.
 
+## Certificate-verified patch repair
+
+What happens when a machine, rather than a developer, writes the fix? The
+second paper's first experiment asks that question on the 57 pairs whose
+labelled flow is confirmed. A model sees the vulnerable source and the
+certificate — never the real fix, the advisory, the commit or the repository
+name — and returns a corrected file. The certificate judges the answer; the
+diff never does. Full method, pre-registration and results are in
+[the experiment directory](experiments/patch-repair-results.md).
+
+| Outcome | Pairs | Meaning |
+| --- | --- | --- |
+| certificate-verified kill | 31/57 | the source parses, the labelled flow is gone, and no new flow appeared |
+| guard-only | 21/57 | the source parses but the targeted flow still holds — the certificate refuses the patch |
+| flow replaced | 6/57 | the labelled flow was replaced by another one of the same class |
+| new flow | 6/57 | a new flow of some class appeared after the fix |
+
+All 57 answers parse. The 21 guard-only patches are the finding: a parse
+check or a passing test suite would accept them, and the certificate refuses
+them because the flow is still standing. The generator is an agent
+configuration, not a fixed public checkpoint, so the raw answers are in the
+frozen archive and the results file published here is the artefact of record.
+Public upstream fixes are a stated confound: 23 of 57 proposed changes have
+high token overlap with the real fix, so the result is not a claim about
+novelty.
+
+Machine-readable: `data/llm_patch.json` (results and rates only, no source).
+
 ---

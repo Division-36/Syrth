@@ -46,6 +46,28 @@ publishes.
   is no longer published, and `v1-prod` replaces them. No code change requires a
   migration: the CLI, the Python API and the rule set are unchanged.
 
+## Unreleased
+
+### Added
+
+- The first experiment of the second paper: certificate-verified patch repair
+  on the 57 pairs with a confirmed flow. A model sees only the vulnerable
+  source and the certificate; the certificate judges the answer. 31 of 57
+  answers are verified kills, 21 are guard-only fixes the certificate refuses
+  although they parse, and 6 introduce a new flow. The method is registered
+  in `docs/experiments/paper2-preregistration.md` before the first attempt,
+  the results in `docs/experiments/patch-repair-results.md`, and the numbers
+  in `data/llm_patch.json`.
+- `benchmarks/llm_patch.py` prepares the prompts (refusing any that carry the
+  patched side, the advisory or the commit), collects the recorded answers,
+  and verifies each one by re-scanning it and comparing certificates. An
+  automated test covers the leakage guard.
+
+### Changed
+
+- `benchmarks/verify_published.py` also checks the repair experiment's
+  published results.
+
 ## v1.1-measurement — 2026-11-10
 
 The measurement evidence release: the four patch and identity studies, the
@@ -91,7 +113,7 @@ whole-repository replay, and the analyser fix that made the replay possible.
 - `syrth.parser.python.parameter_is_source` is a single documented seam that
   lets the ablation harness disable the position-seeded source rule without
   editing the analyser. Nothing in the product overrides it.
-- The documentation quotes 658 tests, states that skips are
+- The documentation quotes 659 tests, states that skips are
   environment-dependent, and adds a whole-repository section to
   [benchmark.md](benchmark.md).
 - The paper sources are excluded from the tree: the manuscript is a separate
