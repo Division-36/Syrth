@@ -63,10 +63,23 @@ publishes.
   and verifies each one by re-scanning it and comparing certificates. An
   automated test covers the leakage guard.
 
+### Added
+
+- The second experiment of the second paper, registered in
+  `docs/experiments/cross-tool-preregistration.md`: the four instruments run
+  on whole worktrees of 24 repositories, one fix commit each. The comparison
+  is co-location with certificates at file and function level, not precision
+  or recall. `benchmarks/cross_tool_repo.py` checkpoints after each repository
+  and resumes from the JSON file.
+- `benchmarks/cross_tool_repo.py` derives the enclosing function for external
+  tools' findings from the source at their reported line, because Bandit,
+  Semgrep and Ruff report a file and a line but not a function name.
+
 ### Changed
 
 - `benchmarks/verify_published.py` also checks the repair experiment's
   published results.
+- `make cross-tool` runs the whole-tree comparison.
 
 ## v1.1-measurement — 2026-11-10
 
@@ -113,7 +126,7 @@ whole-repository replay, and the analyser fix that made the replay possible.
 - `syrth.parser.python.parameter_is_source` is a single documented seam that
   lets the ablation harness disable the position-seeded source rule without
   editing the analyser. Nothing in the product overrides it.
-- The documentation quotes 659 tests, states that skips are
+- The documentation quotes 669 tests, states that skips are
   environment-dependent, and adds a whole-repository section to
   [benchmark.md](benchmark.md).
 - The paper sources are excluded from the tree: the manuscript is a separate

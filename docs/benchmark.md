@@ -545,4 +545,29 @@ novelty.
 
 Machine-readable: `data/llm_patch.json` (results and rates only, no source).
 
+## Cross-tool comparison on full worktrees
+
+The snippet comparison above is repeated on whole repositories: the four
+instruments are pointed at the vulnerable revision of one fix commit per
+repository, across all 24 repositories. The measure is **co-location** — does
+a tool's finding land in a file+function where SYRTH emitted a certificate —
+never precision or recall. Bandit, Semgrep and Ruff report a file and a line,
+not a function; the function is derived from the source at that line.
+
+| Instrument | Findings | Co-located with a certificate | Labelled file hit |
+|---|---|---|---|
+| SYRTH (with call graph) | 579,497 | 8,075/8,075 | 23/24 |
+| Bandit 1.9.4 | 103,575 | 2,203/44,208 | 17/24 |
+| Semgrep 1.185.0 | 1,205 | 241/500 | 11/24 |
+| Ruff 0.15.15 | 61,339 | 1,837/26,602 | 17/24 |
+
+Semgrep's higher share (48.2%) sits on a much smaller denominator (500
+findings with a recoverable function) than Bandit's 44,208, so the percentage
+alone would flatter the narrower instrument. Both counts are published. This
+is agreement on location, not a detection-quality ranking. Method,
+pre-registration and caveats are in
+[the experiment directory](experiments/cross-tool-results.md).
+
+Machine-readable: `data/cross_tool_repo.json`.
+
 ---

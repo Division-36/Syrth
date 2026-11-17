@@ -31,12 +31,13 @@ FILE ?=
 
 .PHONY: help install install-dev install-benchmark test test-verbose lint \
         check scan scan-json scan-sarif fix diff bench competitors corpus \
-        patch-study ablation identity whole-repo verify-published \
+        patch-study ablation identity whole-repo verify-published cross-tool \
         train export-smoke docs-check build clean clean-windows
 
 help:
 	@echo "make check | test | lint | scan FILE= | bench | competitors | corpus"
 	@echo "make patch-study | ablation | identity | whole-repo | verify-published"
+	@echo "make cross-tool"
 
 install:
 	$(PYTHON) -m pip install -e .
@@ -120,6 +121,15 @@ whole-repo:
 # Exits non-zero when a published file no longer matches its harness.
 verify-published:
 	$(PYTHON) -m benchmarks.verify_published --dataset $(DATASET)
+
+# The second paper's cross-tool scan: one fix commit per repository, whole
+# worktrees, four instruments. Needs bandit, semgrep and ruff on PATH, plus
+# the repositories under experiments/scratch/repos. Takes minutes; the JSON
+# is a checkpoint, so a killed run resumes at the last finished repository.
+cross-tool:
+	$(PYTHON) -m benchmarks.cross_tool_repo --dataset $(DATASET) \
+		--repos experiments/scratch/repos \
+		--json data/cross_tool_repo.json
 
 train:
 	$(PYTHON) -m syrth.train --dataset $(DATASET)

@@ -38,7 +38,7 @@ Do not claim a command passed unless you ran it and read the output.
 | `syrth/scan.py` | scanner and CLI |
 | `syrth/patch.py` | patch backends and verification |
 | `benchmarks/` | the harness |
-| `tests/` | 659 tests |
+| `tests/` | 669 tests |
 
 ## House rules
 

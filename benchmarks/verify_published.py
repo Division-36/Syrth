@@ -386,6 +386,16 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "rates",
         "results",
     ),
+    "data/cross_tool_repo.json": (
+        "dataset",
+        "repos",
+        "repositories",
+        "tools",
+        "scope",
+        "complete",
+        "per_tool",
+        "rows",
+    ),
 }
 
 
