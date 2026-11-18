@@ -255,7 +255,7 @@ tables, so they are comparable to each other.
 
 | Tool | Class coverage | Sink coverage | Fix noticed | Still flagged | Time |
 |---|---|---|---|---|---|
-| **SYRTH v1-prod** | **111/116** (95.7%) | **199/217** (91.7%) | 8/74 | 66/74 | 3.5s |
+| **SYRTH 1.1** | **111/116** (95.7%) | **199/217** (91.7%) | 8/74 | 66/74 | 3.5s |
 | Bandit 1.9.4 | 23/116 (19.8%) | 11/217 (5.1%) | 8/60 | 52/60 | 19.6s |
 | Semgrep 1.180.0 `p/security-audit` | 17/116 (14.7%) | 14/217 (6.5%) | 11/25 | 14/25 | 99.0s |
 | Semgrep 1.180.0 `p/owasp-top-ten` | 0/116 (0.0%) | 0/217 (0.0%) | 1/3 | 2/3 | 24.0s |

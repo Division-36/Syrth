@@ -37,7 +37,7 @@ Quick start::
         print(finding.summary_text())
 """
 
-__version__ = "1.0.0+prod"
+__version__ = "1.1"
 __author__ = "SYRTH Project"
 
 from .features import FeatureExtractor

@@ -262,11 +262,14 @@ class TestVersionIsSingleSourced:
 
     def test_version_is_a_release_number(self):
         declared = self._declared()
-        # PEP 440 allows a local segment after "+", which is how this project
-        # carries its release channel: 1.0.0+prod is the artefact version of the
-        # release tagged v1-prod. The release part must still be numeric.
+        # PEP 440 allows a local segment after "+", which is how the first
+        # release carried its channel: 1.0.0+prod was the artefact version of
+        # the release tagged v1-prod. From 1.1 the tag and the version are the
+        # same number, which may carry a major and minor only. CI compares a
+        # numeric tag with this string exactly, so the release part stays
+        # numeric in either shape.
         release = declared.split("+", 1)[0]
         parts = release.split(".")
-        assert len(parts) == 3 and all(p.isdigit() for p in parts), (
-            f"expected major.minor.patch[+local], found {declared!r}"
+        assert len(parts) in (2, 3) and all(p.isdigit() for p in parts), (
+            f"expected major.minor[.patch][+local], found {declared!r}"
         )
