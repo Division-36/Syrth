@@ -1,0 +1,2013 @@
+{
+  "dataset": "data/corpus.jsonl",
+  "repos": "experiments/scratch/repos",
+  "repositories": 24,
+  "tools": [
+    "syrth",
+    "bandit",
+    "semgrep",
+    "ruff"
+  ],
+  "scope": {
+    "one_commit_per_repository": true,
+    "whole_worktree": true,
+    "co_location_not_precision": true
+  },
+  "complete": true,
+  "per_tool": {
+    "syrth": {
+      "repositories": 24,
+      "total_findings": 579497,
+      "median_findings_per_repository": 681,
+      "labelled_file_hits": [
+        23,
+        24
+      ],
+      "labelled_function_hits": [
+        14,
+        24
+      ],
+      "certificate_co_location": [
+        8075,
+        8075
+      ],
+      "seconds": 1026.93
+    },
+    "bandit": {
+      "repositories": 24,
+      "total_findings": 103575,
+      "median_findings_per_repository": 1480,
+      "labelled_file_hits": [
+        17,
+        24
+      ],
+      "labelled_function_hits": [
+        3,
+        24
+      ],
+      "certificate_co_location": [
+        2203,
+        44208
+      ],
+      "seconds": 487.74
+    },
+    "semgrep": {
+      "repositories": 24,
+      "total_findings": 1205,
+      "median_findings_per_repository": 26,
+      "labelled_file_hits": [
+        11,
+        24
+      ],
+      "labelled_function_hits": [
+        2,
+        24
+      ],
+      "certificate_co_location": [
+        241,
+        500
+      ],
+      "seconds": 743.95
+    },
+    "ruff": {
+      "repositories": 24,
+      "total_findings": 61339,
+      "median_findings_per_repository": 1099,
+      "labelled_file_hits": [
+        17,
+        24
+      ],
+      "labelled_function_hits": [
+        4,
+        24
+      ],
+      "certificate_co_location": [
+        1837,
+        26602
+      ],
+      "seconds": 9.1
+    }
+  },
+  "rows": [
+    {
+      "repo": "aiohttp",
+      "commit": "dcf40f30637e8752c76781cf6703b5a236749a00",
+      "labelled_file": "aiohttp/cookiejar.py",
+      "labelled_function": "save",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 138,
+          "files_touched": 15,
+          "functions_touched": 26,
+          "seconds": 10.45,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            26,
+            26
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 6878,
+          "files_touched": 107,
+          "functions_touched": 2694,
+          "seconds": 12.01,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            18,
+            2694
+          ],
+          "files_in_common_with_syrth": [
+            14,
+            107
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 5,
+          "files_touched": 5,
+          "functions_touched": 5,
+          "seconds": 22.55,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            1,
+            5
+          ],
+          "files_in_common_with_syrth": [
+            1,
+            5
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 6843,
+          "files_touched": 105,
+          "functions_touched": 2680,
+          "seconds": 0.84,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            17,
+            2680
+          ],
+          "files_in_common_with_syrth": [
+            14,
+            105
+          ]
+        }
+      }
+    },
+    {
+      "repo": "ansible",
+      "commit": "1e930684bc0a76ec3d094cd326738ad26416541c",
+      "labelled_file": "lib/ansible/galaxy/role.py",
+      "labelled_function": "install",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 2774,
+          "files_touched": 240,
+          "functions_touched": 570,
+          "seconds": 21.99,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            570,
+            570
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 2998,
+          "files_touched": 367,
+          "functions_touched": 1189,
+          "seconds": 19.28,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            139,
+            1189
+          ],
+          "files_in_common_with_syrth": [
+            114,
+            367
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 35,
+          "files_touched": 19,
+          "functions_touched": 24,
+          "seconds": 36.53,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            12,
+            24
+          ],
+          "files_in_common_with_syrth": [
+            13,
+            19
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 3005,
+          "files_touched": 370,
+          "functions_touched": 1177,
+          "seconds": 0.5,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            136,
+            1177
+          ],
+          "files_in_common_with_syrth": [
+            114,
+            370
+          ]
+        }
+      }
+    },
+    {
+      "repo": "apache-airflow",
+      "commit": "8159f6e24704f5e0e3b3217cf79ecf5083dce531",
+      "labelled_file": "airflow/models/dag.py",
+      "labelled_function": "get_doc_md",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 14201,
+          "files_touched": 470,
+          "functions_touched": 1041,
+          "seconds": 102.45,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            1041,
+            1041
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 23409,
+          "files_touched": 1489,
+          "functions_touched": 10077,
+          "seconds": 71.04,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            305,
+            10077
+          ],
+          "files_in_common_with_syrth": [
+            244,
+            1489
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 77,
+          "files_touched": 43,
+          "functions_touched": 22,
+          "seconds": 58.86,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            10,
+            22
+          ],
+          "files_in_common_with_syrth": [
+            15,
+            43
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 1741,
+          "files_touched": 547,
+          "functions_touched": 946,
+          "seconds": 0.64,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            156,
+            946
+          ],
+          "files_in_common_with_syrth": [
+            171,
+            547
+          ]
+        }
+      }
+    },
+    {
+      "repo": "cherrypy",
+      "commit": "37b856eba6f207231c691dae2e5b24e072f86664",
+      "labelled_file": "cherrypy/lib/sessions.py",
+      "labelled_function": "_get_file_path",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 73,
+          "files_touched": 16,
+          "functions_touched": 33,
+          "seconds": 1.32,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            33,
+            33
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 27,
+          "files_touched": 17,
+          "functions_touched": 20,
+          "seconds": 1.1,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            6,
+            20
+          ],
+          "files_in_common_with_syrth": [
+            7,
+            17
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 11,
+          "files_touched": 4,
+          "functions_touched": 3,
+          "seconds": 12.95,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            2,
+            3
+          ],
+          "files_in_common_with_syrth": [
+            3,
+            4
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 146,
+          "files_touched": 33,
+          "functions_touched": 21,
+          "seconds": 0.12,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            7,
+            21
+          ],
+          "files_in_common_with_syrth": [
+            11,
+            33
+          ]
+        }
+      }
+    },
+    {
+      "repo": "django",
+      "commit": "005d60d97c4dfb117503bdb6f2facfcaf9315d84",
+      "labelled_file": "django/db/models/sql/query.py",
+      "labelled_function": "add_filtered_relation",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 3634,
+          "files_touched": 274,
+          "functions_touched": 669,
+          "seconds": 49.79,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            669,
+            669
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 1265,
+          "files_touched": 303,
+          "functions_touched": 792,
+          "seconds": 45.68,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            114,
+            792
+          ],
+          "files_in_common_with_syrth": [
+            107,
+            303
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 472,
+          "files_touched": 124,
+          "functions_touched": 139,
+          "seconds": 24.56,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            60,
+            139
+          ],
+          "files_in_common_with_syrth": [
+            48,
+            124
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 855,
+          "files_touched": 241,
+          "functions_touched": 593,
+          "seconds": 0.37,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            111,
+            593
+          ],
+          "files_in_common_with_syrth": [
+            104,
+            241
+          ]
+        }
+      }
+    },
+    {
+      "repo": "ipython",
+      "commit": "c2078a53543ed502efd968649fee1125e0eb549c",
+      "labelled_file": "IPython/html/base/handlers.py",
+      "labelled_function": "json_errors",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 1155,
+          "files_touched": 181,
+          "functions_touched": 421,
+          "seconds": 9.36,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            421,
+            421
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 839,
+          "files_touched": 238,
+          "functions_touched": 475,
+          "seconds": 9.14,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            108,
+            475
+          ],
+          "files_in_common_with_syrth": [
+            112,
+            238
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 109,
+          "files_touched": 56,
+          "functions_touched": 66,
+          "seconds": 24.86,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            39,
+            66
+          ],
+          "files_in_common_with_syrth": [
+            39,
+            56
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 802,
+          "files_touched": 295,
+          "functions_touched": 434,
+          "seconds": 0.44,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            108,
+            434
+          ],
+          "files_in_common_with_syrth": [
+            105,
+            295
+          ]
+        }
+      }
+    },
+    {
+      "repo": "joblib",
+      "commit": "b90f10efeb670a2cc877fb88ebb3f2019189e059",
+      "labelled_file": "joblib/parallel.py",
+      "labelled_function": "__call__",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 257,
+          "files_touched": 30,
+          "functions_touched": 81,
+          "seconds": 1.22,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            81,
+            81
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 744,
+          "files_touched": 44,
+          "functions_touched": 260,
+          "seconds": 1.89,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            34,
+            260
+          ],
+          "files_in_common_with_syrth": [
+            23,
+            44
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 17,
+          "files_touched": 9,
+          "functions_touched": 13,
+          "seconds": 19.85,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            4,
+            13
+          ],
+          "files_in_common_with_syrth": [
+            8,
+            9
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 711,
+          "files_touched": 36,
+          "functions_touched": 257,
+          "seconds": 0.12,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            34,
+            257
+          ],
+          "files_in_common_with_syrth": [
+            21,
+            36
+          ]
+        }
+      }
+    },
+    {
+      "repo": "keras",
+      "commit": "23370f16b0ab9a200f7550a34e54a3ceab74ba0e",
+      "labelled_file": "keras/src/saving/file_editor.py",
+      "labelled_function": "_extract_weights_from_store",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 2834,
+          "files_touched": 69,
+          "functions_touched": 144,
+          "seconds": 45.39,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            144,
+            144
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 122,
+          "files_touched": 45,
+          "functions_touched": 72,
+          "seconds": 25.34,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            8,
+            72
+          ],
+          "files_in_common_with_syrth": [
+            17,
+            45
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 26,
+          "files_touched": 12,
+          "functions_touched": 13,
+          "seconds": 41.8,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            4,
+            13
+          ],
+          "files_in_common_with_syrth": [
+            5,
+            12
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 67,
+          "files_touched": 37,
+          "functions_touched": 50,
+          "seconds": 0.24,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            6,
+            50
+          ],
+          "files_in_common_with_syrth": [
+            17,
+            37
+          ]
+        }
+      }
+    },
+    {
+      "repo": "langchain",
+      "commit": "dcaf7795a3e6590af55c3ff7bda6add6355e9ea6",
+      "labelled_file": "libs/partners/anthropic/langchain_anthropic/middleware/anthropic_tools.py",
+      "labelled_function": "_validate_path",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 338,
+          "files_touched": 26,
+          "functions_touched": 82,
+          "seconds": 26.9,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            82,
+            82
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 13745,
+          "files_touched": 527,
+          "functions_touched": 4649,
+          "seconds": 26.85,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            56,
+            4649
+          ],
+          "files_in_common_with_syrth": [
+            14,
+            527
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 7,
+          "files_touched": 4,
+          "functions_touched": 3,
+          "seconds": 34.44,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            0,
+            3
+          ],
+          "files_in_common_with_syrth": [
+            0,
+            4
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 842,
+          "files_touched": 19,
+          "functions_touched": 229,
+          "seconds": 0.27,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            39,
+            229
+          ],
+          "files_in_common_with_syrth": [
+            2,
+            19
+          ]
+        }
+      }
+    },
+    {
+      "repo": "llama-index",
+      "commit": "d73715eaf0642705583e7897c78b9c8dd2d3a7ba",
+      "labelled_file": "llama-index-integrations/llms/llama-index-llms-rungpt/llama_index/llms/rungpt/base.py",
+      "labelled_function": "stream_complete",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 2445,
+          "files_touched": 272,
+          "functions_touched": 465,
+          "seconds": 20.06,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            465,
+            465
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 4652,
+          "files_touched": 1025,
+          "functions_touched": 2050,
+          "seconds": 18.98,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            170,
+            2050
+          ],
+          "files_in_common_with_syrth": [
+            153,
+            1025
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 39,
+          "files_touched": 20,
+          "functions_touched": 30,
+          "seconds": 38.31,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            17,
+            30
+          ],
+          "files_in_common_with_syrth": [
+            18,
+            20
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 4531,
+          "files_touched": 996,
+          "functions_touched": 2000,
+          "seconds": 0.65,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            168,
+            2000
+          ],
+          "files_in_common_with_syrth": [
+            141,
+            996
+          ]
+        }
+      }
+    },
+    {
+      "repo": "mistune",
+      "commit": "1bef343ade163fc3bb95572b15be720084cdb993",
+      "labelled_file": "src/mistune/directives/include.py",
+      "labelled_function": "parse",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 10,
+          "files_touched": 5,
+          "functions_touched": 7,
+          "seconds": 0.49,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            7,
+            7
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 20,
+          "files_touched": 11,
+          "functions_touched": 16,
+          "seconds": 0.64,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            0,
+            16
+          ],
+          "files_in_common_with_syrth": [
+            1,
+            11
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 0,
+          "files_touched": 0,
+          "functions_touched": 0,
+          "seconds": 21.14,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            0,
+            0
+          ],
+          "files_in_common_with_syrth": [
+            0,
+            0
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 20,
+          "files_touched": 11,
+          "functions_touched": 16,
+          "seconds": 0.06,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            0,
+            16
+          ],
+          "files_in_common_with_syrth": [
+            1,
+            11
+          ]
+        }
+      }
+    },
+    {
+      "repo": "notebook",
+      "commit": "979e0bd15e794ceb00cc63737fcd5fd9addc4a99",
+      "labelled_file": "notebook/auth/login.py",
+      "labelled_function": "_redirect_safe",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 248,
+          "files_touched": 41,
+          "functions_touched": 108,
+          "seconds": 1.13,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            108,
+            108
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 193,
+          "files_touched": 34,
+          "functions_touched": 70,
+          "seconds": 1.52,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            11,
+            70
+          ],
+          "files_in_common_with_syrth": [
+            14,
+            34
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 18,
+          "files_touched": 11,
+          "functions_touched": 3,
+          "seconds": 15.8,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            2,
+            3
+          ],
+          "files_in_common_with_syrth": [
+            4,
+            11
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 185,
+          "files_touched": 34,
+          "functions_touched": 68,
+          "seconds": 0.08,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            11,
+            68
+          ],
+          "files_in_common_with_syrth": [
+            13,
+            34
+          ]
+        }
+      }
+    },
+    {
+      "repo": "paramiko",
+      "commit": "a4489456b6f65281e172380cc4826cee5e851dbb",
+      "labelled_file": "paramiko/config.py",
+      "labelled_function": "_tokenize",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 217,
+          "files_touched": 19,
+          "functions_touched": 80,
+          "seconds": 1.4,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            80,
+            80
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 626,
+          "files_touched": 34,
+          "functions_touched": 323,
+          "seconds": 2.15,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            41,
+            323
+          ],
+          "files_in_common_with_syrth": [
+            14,
+            34
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 7,
+          "files_touched": 3,
+          "functions_touched": 5,
+          "seconds": 23.15,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            0,
+            5
+          ],
+          "files_in_common_with_syrth": [
+            2,
+            3
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 600,
+          "files_touched": 32,
+          "functions_touched": 309,
+          "seconds": 0.1,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            41,
+            309
+          ],
+          "files_in_common_with_syrth": [
+            14,
+            32
+          ]
+        }
+      }
+    },
+    {
+      "repo": "pillow",
+      "commit": "45c726fd4daa63236a8f3653530f297dc87b160a",
+      "labelled_file": "src/PIL/ImageMath.py",
+      "labelled_function": "eval",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 932,
+          "files_touched": 91,
+          "functions_touched": 357,
+          "seconds": 4.49,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            357,
+            357
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 3036,
+          "files_touched": 167,
+          "functions_touched": 1116,
+          "seconds": 5.55,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            229,
+            1116
+          ],
+          "files_in_common_with_syrth": [
+            71,
+            167
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 35,
+          "files_touched": 15,
+          "functions_touched": 8,
+          "seconds": 20.91,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            6,
+            8
+          ],
+          "files_in_common_with_syrth": [
+            4,
+            15
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 3008,
+          "files_touched": 168,
+          "functions_touched": 1117,
+          "seconds": 0.26,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            230,
+            1117
+          ],
+          "files_in_common_with_syrth": [
+            72,
+            168
+          ]
+        }
+      }
+    },
+    {
+      "repo": "pip",
+      "commit": "a4c735b14a62f9cb864533808ac63936704f2ace",
+      "labelled_file": "src/pip/_internal/download.py",
+      "labelled_function": "_download_http_url",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 4185,
+          "files_touched": 126,
+          "functions_touched": 373,
+          "seconds": 16.49,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            373,
+            373
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 2012,
+          "files_touched": 152,
+          "functions_touched": 1061,
+          "seconds": 9.67,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            75,
+            1061
+          ],
+          "files_in_common_with_syrth": [
+            74,
+            152
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 28,
+          "files_touched": 18,
+          "functions_touched": 10,
+          "seconds": 33.31,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            3,
+            10
+          ],
+          "files_in_common_with_syrth": [
+            8,
+            18
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 1986,
+          "files_touched": 147,
+          "functions_touched": 1061,
+          "seconds": 0.23,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            76,
+            1061
+          ],
+          "files_in_common_with_syrth": [
+            72,
+            147
+          ]
+        }
+      }
+    },
+    {
+      "repo": "pyramid",
+      "commit": "347d7750da6f45c7436dd0c31468885cc9343c85",
+      "labelled_file": "src/pyramid/static.py",
+      "labelled_function": "_secure_path",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 80,
+          "files_touched": 42,
+          "functions_touched": 58,
+          "seconds": 4.25,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            58,
+            58
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 287,
+          "files_touched": 81,
+          "functions_touched": 191,
+          "seconds": 4.9,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            3,
+            191
+          ],
+          "files_in_common_with_syrth": [
+            10,
+            81
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 11,
+          "files_touched": 6,
+          "functions_touched": 7,
+          "seconds": 17.41,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            2,
+            7
+          ],
+          "files_in_common_with_syrth": [
+            2,
+            6
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 254,
+          "files_touched": 78,
+          "functions_touched": 162,
+          "seconds": 0.12,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            3,
+            162
+          ],
+          "files_in_common_with_syrth": [
+            10,
+            78
+          ]
+        }
+      }
+    },
+    {
+      "repo": "salt",
+      "commit": "c4ad23f0f3132d8d8a88f19fa537dc42cf21b215",
+      "labelled_file": "salt/master.py",
+      "labelled_function": "_file_recv",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 535936,
+          "files_touched": 545,
+          "functions_touched": 1400,
+          "seconds": 519.71,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            1400,
+            1400
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 26888,
+          "files_touched": 1904,
+          "functions_touched": 11800,
+          "seconds": 78.66,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            349,
+            11800
+          ],
+          "files_in_common_with_syrth": [
+            334,
+            1904
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 143,
+          "files_touched": 86,
+          "functions_touched": 69,
+          "seconds": 66.19,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            33,
+            69
+          ],
+          "files_in_common_with_syrth": [
+            47,
+            86
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 26123,
+          "files_touched": 1859,
+          "functions_touched": 11595,
+          "seconds": 2.25,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            342,
+            11595
+          ],
+          "files_in_common_with_syrth": [
+            329,
+            1859
+          ]
+        }
+      }
+    },
+    {
+      "repo": "setuptools",
+      "commit": "250a6d17978f9f6ac3ac887091f2d32886fbbb0b",
+      "labelled_file": "setuptools/package_index.py",
+      "labelled_function": "_resolve_download_filename",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 1312,
+          "files_touched": 128,
+          "functions_touched": 416,
+          "seconds": 16.63,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            416,
+            416
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 1807,
+          "files_touched": 159,
+          "functions_touched": 802,
+          "seconds": 7.0,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            80,
+            802
+          ],
+          "files_in_common_with_syrth": [
+            73,
+            159
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 18,
+          "files_touched": 13,
+          "functions_touched": 13,
+          "seconds": 23.23,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            9,
+            13
+          ],
+          "files_in_common_with_syrth": [
+            9,
+            13
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 1099,
+          "files_touched": 77,
+          "functions_touched": 522,
+          "seconds": 0.14,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            55,
+            522
+          ],
+          "files_in_common_with_syrth": [
+            45,
+            77
+          ]
+        }
+      }
+    },
+    {
+      "repo": "sqlalchemy",
+      "commit": "51fea2e159ca93daa0bc8066a5c35d8436d99418",
+      "labelled_file": "lib/sqlalchemy/dialects/oracle/base.py",
+      "labelled_function": "visit_select",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 543,
+          "files_touched": 90,
+          "functions_touched": 237,
+          "seconds": 11.86,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            237,
+            237
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 1854,
+          "files_touched": 113,
+          "functions_touched": 718,
+          "seconds": 9.52,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            24,
+            718
+          ],
+          "files_in_common_with_syrth": [
+            39,
+            113
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 16,
+          "files_touched": 9,
+          "functions_touched": 6,
+          "seconds": 30.19,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            1,
+            6
+          ],
+          "files_in_common_with_syrth": [
+            4,
+            9
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 2189,
+          "files_touched": 187,
+          "functions_touched": 713,
+          "seconds": 0.43,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            21,
+            713
+          ],
+          "files_in_common_with_syrth": [
+            68,
+            187
+          ]
+        }
+      }
+    },
+    {
+      "repo": "starlette",
+      "commit": "1797de464124b090f10cf570441e8292936d63e3",
+      "labelled_file": "starlette/staticfiles.py",
+      "labelled_function": "lookup_path",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 182,
+          "files_touched": 21,
+          "functions_touched": 64,
+          "seconds": 0.96,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            64,
+            64
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 1110,
+          "files_touched": 48,
+          "functions_touched": 381,
+          "seconds": 1.54,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            46,
+            381
+          ],
+          "files_in_common_with_syrth": [
+            18,
+            48
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 1,
+          "files_touched": 1,
+          "functions_touched": 0,
+          "seconds": 18.65,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            0,
+            0
+          ],
+          "files_in_common_with_syrth": [
+            0,
+            1
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 1110,
+          "files_touched": 48,
+          "functions_touched": 380,
+          "seconds": 0.12,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            45,
+            380
+          ],
+          "files_in_common_with_syrth": [
+            18,
+            48
+          ]
+        }
+      }
+    },
+    {
+      "repo": "tornado",
+      "commit": "32ad07c54e607839273b4e1819c347f5c8976b2f",
+      "labelled_file": "tornado/web.py",
+      "labelled_function": "validate_absolute_path",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 127,
+          "files_touched": 29,
+          "functions_touched": 56,
+          "seconds": 2.53,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            56,
+            56
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 296,
+          "files_touched": 60,
+          "functions_touched": 187,
+          "seconds": 3.09,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            15,
+            187
+          ],
+          "files_in_common_with_syrth": [
+            26,
+            60
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 12,
+          "files_touched": 9,
+          "functions_touched": 4,
+          "seconds": 17.67,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            1,
+            4
+          ],
+          "files_in_common_with_syrth": [
+            4,
+            9
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 270,
+          "files_touched": 56,
+          "functions_touched": 178,
+          "seconds": 0.09,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            13,
+            178
+          ],
+          "files_in_common_with_syrth": [
+            25,
+            56
+          ]
+        }
+      }
+    },
+    {
+      "repo": "transformers",
+      "commit": "eaaaf8494dd5386634ae37d1d122212fdc315be5",
+      "labelled_file": "src/transformers/processing_utils.py",
+      "labelled_function": "save_pretrained",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 7056,
+          "files_touched": 602,
+          "functions_touched": 1006,
+          "seconds": 129.19,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            1006,
+            1006
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 8551,
+          "files_touched": 1382,
+          "functions_touched": 4377,
+          "seconds": 106.92,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            328,
+            4377
+          ],
+          "files_in_common_with_syrth": [
+            449,
+            1382
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 31,
+          "files_touched": 24,
+          "functions_touched": 22,
+          "seconds": 79.2,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            20,
+            22
+          ],
+          "files_in_common_with_syrth": [
+            17,
+            24
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 2788,
+          "files_touched": 727,
+          "functions_touched": 1200,
+          "seconds": 0.64,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": false,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            168,
+            1200
+          ],
+          "files_in_common_with_syrth": [
+            305,
+            727
+          ]
+        }
+      }
+    },
+    {
+      "repo": "twisted",
+      "commit": "046a164f89a0f08d3239ecebd750360f8914df33",
+      "labelled_file": "src/twisted/web/_template_util.py",
+      "labelled_function": "redirectTo",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 681,
+          "files_touched": 162,
+          "functions_touched": 308,
+          "seconds": 27.15,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": true,
+          "certificate_co_location": [
+            308,
+            308
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 736,
+          "files_touched": 234,
+          "functions_touched": 533,
+          "seconds": 23.06,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            33,
+            533
+          ],
+          "files_in_common_with_syrth": [
+            80,
+            234
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 37,
+          "files_touched": 23,
+          "functions_touched": 19,
+          "seconds": 35.51,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            8,
+            19
+          ],
+          "files_in_common_with_syrth": [
+            13,
+            23
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 701,
+          "files_touched": 228,
+          "functions_touched": 536,
+          "seconds": 0.24,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            36,
+            536
+          ],
+          "files_in_common_with_syrth": [
+            83,
+            228
+          ]
+        }
+      }
+    },
+    {
+      "repo": "werkzeug",
+      "commit": "1034edc7f901dd645ec6e462754111b39002bd65",
+      "labelled_file": "werkzeug/debug/tbtools.py",
+      "labelled_function": "render_full",
+      "tools": {
+        "syrth": {
+          "tool": "syrth",
+          "findings": 139,
+          "files_touched": 41,
+          "functions_touched": 73,
+          "seconds": 1.72,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            73,
+            73
+          ]
+        },
+        "bandit": {
+          "tool": "bandit",
+          "findings": 1480,
+          "files_touched": 54,
+          "functions_touched": 355,
+          "seconds": 2.21,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            11,
+            355
+          ],
+          "files_in_common_with_syrth": [
+            23,
+            54
+          ]
+        },
+        "semgrep": {
+          "tool": "semgrep",
+          "findings": 50,
+          "files_touched": 14,
+          "functions_touched": 16,
+          "seconds": 26.88,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            7,
+            16
+          ],
+          "files_in_common_with_syrth": [
+            6,
+            14
+          ]
+        },
+        "ruff": {
+          "tool": "ruff",
+          "findings": 1463,
+          "files_touched": 55,
+          "functions_touched": 358,
+          "seconds": 0.15,
+          "available": true,
+          "error": "",
+          "labelled_file_hit": true,
+          "labelled_function_hit": false,
+          "certificate_co_location": [
+            14,
+            358
+          ],
+          "files_in_common_with_syrth": [
+            23,
+            55
+          ]
+        }
+      }
+    }
+  ]
+}

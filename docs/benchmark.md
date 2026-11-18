@@ -568,6 +568,8 @@ is agreement on location, not a detection-quality ranking. Method,
 pre-registration and caveats are in
 [the experiment directory](experiments/cross-tool-results.md).
 
-Machine-readable: `data/cross_tool_repo.json`.
+Machine-readable: `data/cross_tool_repo.json` (compact counts). The full
+per-finding file/function lists are kept outside the published tree and can be
+regenerated with `make cross-tool`.
 
 ---
