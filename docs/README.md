@@ -2,14 +2,98 @@
 
 Read these in order. Each builds on the one before it; none assumes you have read the code.
 
-| If you want… | Read |
-|---|---|
-| what the tool claims, and what it refuses to claim | [risk-model.md](risk-model.md) — 5 minutes |
-| a hands-on scan, with real output | [usage.md](usage.md) — 5 minutes |
-| what the current numbers are, with their denominators | [benchmark.md](benchmark.md) — the first two sections are enough |
-| how the analyser is put together | [architecture.md](architecture.md) — 10 minutes |
-| the exact limits, stated plainly | [limitations.md](limitations.md) |
-| how to reproduce every published number | [benchmark.md#which-command-produces-which-number](benchmark.md#which-command-produces-which-number) and `make verify-published` |
+| If you want… | Read | Time |
+|---|---|---|
+| a working example in 30 seconds | [quick example](#quick-example) below | 30 s |
+| what the tool claims, and what it refuses to claim | [risk-model.md](risk-model.md) | 5 min |
+| a hands-on scan, with real output and every flag | [usage.md](usage.md) | 5 min |
+| what the current numbers are, with their denominators | [benchmark.md](benchmark.md) — the first two sections are enough | 5 min |
+| how the analyser is put together | [architecture.md](architecture.md) | 10 min |
+| the exact limits, stated plainly | [limitations.md](limitations.md) | 5 min |
+| answers to the questions people ask most | [FAQ](#faq) below | 3 min |
+| how to reproduce every published number | [benchmark.md#which-command-produces-which-number](benchmark.md#which-command-produces-which-number) and `make verify-published` | — |
+
+## Quick example
+
+A file with a dangerous call:
+
+```python
+# app.py
+import os
+
+def handler(request):
+    return os.system(request.GET["cmd"])
+```
+
+Scan it:
+
+```console
+$ syrth --file app.py
+========================================================================
+SYRTH - Scan Your Risk Trace History
+target : app.py
+model  : rule
+scanned: 1 file(s), 1 function(s), 1 trace(s)
+cross-function flows resolved: 1
+========================================================================
+[CRITICAL] CWE-94 (EXEC) confidence 0.89
+  app.py:4 in handler()
+  sink: os.system -> EXEC_COMMAND via pos:0
+  origin: REQUEST
+  >> L3     param             request
+     L4     attr              request.GET
+     L4     arg               request.GET["cmd"]
+  << L4     os.system         request.GET["cmd"]
+------------------------------------------------------------------------
+```
+
+The finding says *which class is nearest* and *how likely*, with the path that
+supports it. It does not say "vulnerable" or "safe": see
+[risk-model.md](risk-model.md) for why that is a design decision, not a missing
+feature. For installation and the full CLI, see [usage.md](usage.md).
+
+## FAQ
+
+**Why no accuracy, precision or recall?** Those need a positive class, a
+negative class and a verdict. SYRTH reports a risk on every sink contact; a
+suppressed low risk is still an answer. See [risk-model.md](risk-model.md).
+
+**Does a low-confidence finding get hidden?** No. `--threshold` marks a finding
+as low-evidence; it never deletes it. Every sink contact is reported.
+
+**Does it patch code?** It can propose a mechanical patch to the sink argument
+and verify it against three conditions. It cannot refactor, and it declines SQL
+rewrites. See [limitations.md#patching](limitations.md#patching).
+
+**Why does a fix sometimes leave the finding in place?** A guard lowers the
+confidence but leaves the certificate standing, by design. That is what a patch
+verifier checks: the flow must be gone, not merely hidden. See
+[benchmark.md#real-commit-patch-study](benchmark.md#real-commit-patch-study).
+
+**Can I trust the numbers?** Each is published as `n/N` next to the command
+that reproduces it; `make verify-published` re-derives every one and exits non-zero
+if a published file has drifted. The whole-repository replay takes hours, so CI
+checks its invariants instead of re-running it. See
+[benchmark.md#which-command-produces-which-number](benchmark.md#which-command-produces-which-number).
+
+**Which tool is "best"?** The comparison measures which classes each tool names
+and where its findings land, not detection quality. There is no negative class,
+and a tool with no rule for a class cannot be scored as if it had missed one.
+See [benchmark.md#what-this-is-not](benchmark.md#what-this-is-not).
+
+## How the documentation is organised
+
+The pages fall into four layers, the same split that large tool projects use:
+
+| Layer | What it answers | Pages |
+|---|---|---|
+| **Tutorial** | show me a working scan in 30 seconds | [quick example](#quick-example), [usage.md](usage.md) |
+| **How-to** | how do I do a specific thing? | [usage.md](usage.md), [configuration.md](configuration.md), [api.md](api.md) |
+| **Reference** | what exactly are the flags, rules and numbers? | [configuration.md](configuration.md), [benchmark.md](benchmark.md), [architecture.md](architecture.md) |
+| **Explanation** | why is it designed this way? | [risk-model.md](risk-model.md), [internals.md](internals.md), [the audits](#provenance-and-audits) |
+
+You can read top to bottom or drop into the layer you need. The FAQ above answers
+the questions that come up most often.
 
 ## The one-paragraph version
 
