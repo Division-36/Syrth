@@ -134,6 +134,7 @@ experiments/scratch/
 # with its own history, submission state, and (once submitted) a venue's
 # anonymity rules. Tracked in its own repository, not this one.
 paper/
+paper2/
 
 # --- Editor / OS ---
 .vscode/
