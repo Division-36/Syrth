@@ -2,6 +2,16 @@
 
 How SYRTH is measured, and what the current numbers are.
 
+**Reading guide.** The first three sections answer the questions most readers
+have: [why the metrics look unusual](#why-the-metrics-are-unusual),
+[what is measured](#what-is-measured), and
+[current results](#current-results). Stop there if you only need the headline
+numbers. The sections after that are the evidence behind them: how ground truth
+was derived, why the kill rate moved, how the tool compares with others, what
+each analysis decision contributes, and what happens to a certificate when a
+fix — human or machine — is applied. Every number carries its denominator, and
+every figure has a command that reproduces it.
+
 ## Why the metrics are unusual
 
 SYRTH is a risk-surface tool, not a classifier. It does not decide "vulnerable or
@@ -18,6 +28,8 @@ Precision and recall are not defined for it. See [risk-model.md](risk-model.md).
 | **kill rate** | does the category's own mitigation remove the confirmed flow? |
 | **patch study** | applying the corpus's *real* fix commits: does the labelled flow's certificate survive, get removed, or get replaced? |
 | **determinism** | does a repeat scan of identical input produce identical output? |
+| **certificate-verified repair** | when a model proposes the fix, does the certificate still refuse the patches that only add a guard? |
+| **cross-tool co-location** | on whole repositories, do other tools' findings land where SYRTH's certificates are? |
 
 ### Which command produces which number
 
@@ -32,6 +44,8 @@ result is published next to the documentation that quotes it.
 | the component ablation | `python -m benchmarks.ablation --dataset data/corpus.jsonl` | `data/ablation.json` |
 | the real-commit patch study | `python -m benchmarks.patch_study --dataset data/corpus.jsonl` | `data/patch_study.json` |
 | the whole-repository replay | `python -m benchmarks.whole_repo_study --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/whole_repo_study.json` |
+| certificate-verified repair | `python -m benchmarks.llm_patch prepare ... && python -m benchmarks.llm_patch collect ... && python -m benchmarks.llm_patch verify ...` | `data/llm_patch.json` |
+| cross-tool comparison | `python -m benchmarks.cross_tool_repo --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/cross_tool_repo.json` |
 
 The whole-repository replay needs the repositories checked out under
 `experiments/scratch/repos` and takes hours; the rest run in seconds. The
@@ -62,15 +76,13 @@ through `syrth.registry` so the corpus and the analyser agree on what a class
 means. That is a deliberate trade -- see [limitations.md](limitations.md) for why
 it makes the corpus narrower than the raw advisory count.
 
-Two corpora are reported below. They are not interchangeable, and the difference
-between them is the main methodological point on this page.
-
 ## Current results
 
 ### `data/corpus.jsonl` -- the built corpus (current)
 
-`[VERIFIED 2026-10-04]` -- 350 records / 175 pairs / 24 advisories / 24
-repositories / 7 CWE classes, built by `tools/build_corpus.py`:
+350 records / 175 pairs / 24 repositories / 7 CWE classes, built by
+`tools/build_corpus.py`. The numbers below are a live run, not a remembered one;
+`make verify-published` re-derives them:
 
 ```console
 $ python -m benchmarks.risk_metrics --dataset data/corpus.jsonl
@@ -81,7 +93,7 @@ records with sinks found      : 100/350
 category coverage             : 111/116 = 95.7%
 rank agreement (better-evidence first): 22/22 = 100.0%
 rename invariance             : 350/350 = 100.0%
-patch kill rate (confirmed)   : 79/104 = 76.0%
+patch kill rate (confirmed)   : 89/100 = 89.0%
 determinism (repeat run)      : 350/350 = 100.0%
 
 per class (covered/expected):
@@ -138,9 +150,10 @@ repo, commit and file.
 
 ## The kill-rate question, adjudicated
 
-`[VERIFIED 2026-10-04]` -- patch kill rate rose from **76.0% to 89.0%** with
-category coverage unchanged at 95.7%. The rise came from three defects the corpus
-exposed, each with a minimal reproduction.
+The patch kill rate rose from **76.0% to 89.0%** with category coverage
+unchanged at 95.7%. The rise came from three reporting defects the corpus
+exposed, each with a minimal reproduction. They are recorded here because a
+number that changes after a reporting fix is not a result to quote on its own.
 
 Every one of those three is a *reporting* defect: a sanitiser that was not consulted,
 an import that did not bind, an assertion about a literal. None of them required a
@@ -286,8 +299,8 @@ present, not what each tool could in principle find.
   carry no CWE. It is in the table because excluding an instrument that finds real
   sinks would flatter everyone else, and on the axis it can be scored on it reaches
   **33.6%** -- second only to SYRTH, and 16x faster than Semgrep.
-- **Bandit wins the one class both tools model well.** CWE-502 is 14/15 against
-  SYRTH's 15/15. Quoting only the totals would hide that.
+- **One class both tools model well is close.** On CWE-502, SYRTH covers 15/15
+  and Bandit 14/15. Quoting only the totals hides how narrow that gap is.
 - **The mitigation columns are the interesting ones and they are unflattering.**
   Every tool misses most of the fixes it can see. Semgrep notices 11 of the 25 it
   detects; SYRTH notices 8 of the 74 it detects; Bandit 8 of 60. Read them with

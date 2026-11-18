@@ -141,6 +141,14 @@ per-function study — so the per-function numbers are a floor rather than a
 substitute. Method, denominators and caveats are in
 [docs/benchmark.md](docs/benchmark.md).
 
+The same question was asked of machine-written fixes: on 57 confirmed pairs, a
+model saw only the vulnerable source and the certificate, and 21 of its patches
+parsed cleanly while leaving the targeted flow standing — the certificate
+refused them. Separately, on whole worktrees of 24 repositories, the four tools'
+findings were compared by where they land, not by which is "better":
+[both experiments](docs/benchmark.md#certificate-verified-patch-repair) are
+published with their pre-registrations and denominators.
+
 Every published number is re-derivable: `make verify-published` runs each
 harness again and compares the result with the file the documentation quotes.
 

@@ -101,12 +101,37 @@ fixes the bug can still be reported as vulnerable, because the kill model does n
 understand those category/sanitiser pairs. The measured patch kill rate is 89%
 (89/100).
 
+## The two new experiments
+
+**The repair experiment is one model at one point in time.** The generator is an
+agent configuration, not a fixed public checkpoint, and it was not
+seed-controlled. The 31/57 verified-kill rate describes what those 57 answers
+did, not what another model or a rerun would do. Public upstream fixes are a
+stated confound: 23 of 57 proposed changes overlap strongly with the real fix,
+so this is not a novelty claim. The raw answers are in the frozen archive, and
+verification is reproducible from them without the model. The second attempt
+planned as a self-consistency check was not run; the deviation is recorded in
+the pre-registration.
+
+**The cross-tool comparison measures location, not quality.** Co-location says
+a tool's finding and a certificate land at the same file and function. It is not
+precision or recall: there is no negative class, and a tool that models fewer
+classes cannot be penalised as if it had missed them. Bandit, Semgrep and Ruff
+report a file and a line but not a function, so the function is derived from the
+source at that line; findings outside a parseable function are excluded from
+the co-location denominator, and that denominator is published next to the
+numerator. One fix commit per repository was sampled in corpus order, not all
+88 commits, so the comparison is a snapshot, not a census.
+
 ## Performance
 
-Unmeasured. Analysis is O(nodes) per file with no file-size ceiling. Pathological
-input is bounded — a 5000-term expression and 600-level nesting now complete
-where they previously crashed — but throughput and memory have not been profiled,
-and there is no claim about them.
+A whole-repository scan was measured on one machine: 15,478 s of scanner time
+over 88 fix commits and 24 repositories, with the largest revision at 3,795
+files, 46,269 functions and 535,936 certificates. That is a cost observation,
+not a throughput claim — the machine, pruning rules and revision sizes are
+part of the number. Pathological input is bounded: a 5000-term expression and
+600-level nesting complete where they previously crashed. Memory was not
+profiled independently of a run.
 
 ## Installation and environment
 

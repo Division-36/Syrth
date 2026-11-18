@@ -62,9 +62,6 @@ publishes.
   patched side, the advisory or the commit), collects the recorded answers,
   and verifies each one by re-scanning it and comparing certificates. An
   automated test covers the leakage guard.
-
-### Added
-
 - The second experiment of the second paper, registered in
   `docs/experiments/cross-tool-preregistration.md`: the four instruments run
   on whole worktrees of 24 repositories, one fix commit each. The comparison
@@ -80,6 +77,15 @@ publishes.
 - `benchmarks/verify_published.py` also checks the repair experiment's
   published results.
 - `make cross-tool` runs the whole-tree comparison.
+- The documentation was restructured for a first-time reader: `docs/README.md`
+  now opens with a reading guide, a one-paragraph description and a table of
+  every headline number with a link to its detail; `docs/benchmark.md` has a
+  reading guide at the top. Stale figures were corrected in place -- the sample
+  run showed a 76% kill rate after the published rate had become 89%, and one
+  sentence described Bandit as ahead on CWE-502 while the table beside it showed
+  SYRTH ahead 15/15 to 14/15. `docs/limitations.md` now states the limits of the
+  two new experiments and replaces the "performance unmeasured" claim with the
+  whole-repository cost actually observed.
 
 ## v1.1-measurement — 2026-11-10
 
