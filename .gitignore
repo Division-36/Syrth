@@ -72,6 +72,9 @@ data/*.json
 # produced from: the prompts and the responses embed corpus code and stay in
 # the frozen archive.
 !data/llm_patch.json
+# The direct comparison of machine patches against the real developer patches,
+# under the same contract on the same 57 pairs.
+!data/repair_compare.json
 # The cross-tool comparison, which backs the tool table in docs/benchmark.md.
 # Published in compact form: every count the docs quote, with the raw
 # file/function lists left in experiments/scratch (the full result is 7.6 MB

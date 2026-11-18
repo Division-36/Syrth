@@ -1,0 +1,98 @@
+{
+  "dataset": "data/corpus.jsonl",
+  "responses": "data/llm_patch_responses.jsonl",
+  "population": 175,
+  "compared": 57,
+  "contract": {
+    "same_population": true,
+    "same_analyser": true,
+    "same_conditions": true,
+    "descriptive_not_hypothesis_test": true
+  },
+  "generator": {
+    "model": "minimax-m3.1-flash-free",
+    "provider": "opencode",
+    "source": "recorded responses"
+  },
+  "arms": {
+    "machine": {
+      "attempted": 57,
+      "parsed": 57,
+      "flow_gone": 31,
+      "guard_only": 21,
+      "flow_replaced": 6,
+      "new_flow": 6,
+      "rates": {
+        "flow_gone": {
+          "count": 31,
+          "of": 57,
+          "ci95": [
+            0.4159,
+            0.6663
+          ]
+        },
+        "guard_only": {
+          "count": 21,
+          "of": 57,
+          "ci95": [
+            0.2552,
+            0.4982
+          ]
+        },
+        "new_flow": {
+          "count": 6,
+          "of": 57,
+          "ci95": [
+            0.0491,
+            0.2112
+          ]
+        }
+      },
+      "outcomes": {
+        "flow-persists": 4,
+        "flow-replaced": 1,
+        "guard-only": 21,
+        "verified-kill": 31
+      }
+    },
+    "developer": {
+      "attempted": 57,
+      "parsed": 57,
+      "flow_gone": 7,
+      "guard_only": 44,
+      "flow_replaced": 4,
+      "new_flow": 4,
+      "rates": {
+        "flow_gone": {
+          "count": 7,
+          "of": 57,
+          "ci95": [
+            0.0608,
+            0.2325
+          ]
+        },
+        "guard_only": {
+          "count": 44,
+          "of": 57,
+          "ci95": [
+            0.6479,
+            0.8616
+          ]
+        },
+        "new_flow": {
+          "count": 4,
+          "of": 57,
+          "ci95": [
+            0.0276,
+            0.167
+          ]
+        }
+      },
+      "outcomes": {
+        "flow-persists": 6,
+        "guard-only": 44,
+        "verified-kill": 7
+      }
+    }
+  }
+}

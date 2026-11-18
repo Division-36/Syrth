@@ -9,6 +9,24 @@ because PEP 440 can only carry `prod` as a local version segment after a `+`).
 From 1.1 onward the tag, the release title and the packaged version are the
 same number: tag `v1.1`, version `1.1`.
 
+## Unreleased
+
+### Added
+
+- Two direct, like-for-like comparisons requested for the second paper.
+  `benchmarks/repair_compare.py` judges the real developer patch of each of the
+  57 confirmed pairs with the same contract used for the machine patches:
+  machine 31/57 verified kills and 21/57 guard-only, developer 7/57 verified
+  kills and 44/57 guard-only. The guard-only difference is not a quality score;
+  real fixes more often add a containment guard, which leaves the certificate
+  standing by design.
+- A direct tool comparison on the same 24 repositories at the labelled file
+  and function: SYRTH 23/24 file and 14/24 function, Bandit 17/24 and 3/24,
+  Semgrep 11/24 and 2/24, Ruff 17/24 and 4/24. The denominator is 24 for every
+  arm. Both comparisons are in the second paper and in
+  [benchmark.md](benchmark.md).
+- Five tests that keep both arms of the direct comparison under one contract.
+
 ## v1.1 — 2026-11-18
 
 **The measurement evidence release.** This release adds the four patch and
@@ -145,7 +163,7 @@ whole-repository replay, and the analyser fix that made the replay possible.
 - `syrth.parser.python.parameter_is_source` is a single documented seam that
   lets the ablation harness disable the position-seeded source rule without
   editing the analyser. Nothing in the product overrides it.
-- The documentation quotes 669 tests, states that skips are
+- The documentation quotes 674 tests, states that skips are
   environment-dependent, and adds a whole-repository section to
   [benchmark.md](benchmark.md).
 - The paper sources are excluded from the tree: the manuscript is a separate

@@ -396,6 +396,14 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "per_tool",
         "rows",
     ),
+    "data/repair_compare.json": (
+        "dataset",
+        "responses",
+        "population",
+        "compared",
+        "contract",
+        "arms",
+    ),
 }
 
 

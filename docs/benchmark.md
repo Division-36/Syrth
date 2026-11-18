@@ -556,7 +556,15 @@ Public upstream fixes are a stated confound: 23 of 57 proposed changes have
 high token overlap with the real fix, so the result is not a claim about
 novelty.
 
-Machine-readable: `data/llm_patch.json` (results and rates only, no source).
+**Direct comparison with the real fixes.** Applying the same contract to the
+real developer patch of each of the same 57 pairs gives a like-for-like result:
+machine 31/57 verified kills and 21/57 guard-only; developer 7/57 verified kills
+and 44/57 guard-only. The guard-only difference is not a quality score — real
+fixes often add a containment guard, which leaves the certificate standing by
+design. Both arms share the population, the analyser and the conditions.
+
+Machine-readable: `data/llm_patch.json` (results and rates only, no source),
+`data/repair_compare.json` (the direct comparison).
 
 ## Cross-tool comparison on full worktrees
 
@@ -577,9 +585,15 @@ not a function; the function is derived from the source at that line.
 Semgrep's higher share (48.2%) sits on a much smaller denominator (500
 findings with a recoverable function) than Bandit's 44,208, so the percentage
 alone would flatter the narrower instrument. Both counts are published. This
-is agreement on location, not a detection-quality ranking. Method,
-pre-registration and caveats are in
-[the experiment directory](experiments/cross-tool-results.md).
+is agreement on location, not a detection-quality ranking.
+
+**Direct comparison.** On the same 24 repositories, asking whether each tool
+reported in the advisory's file and in the advisory's function gives a
+like-for-like result: SYRTH 23/24 file, 14/24 function; Bandit 17/24, 3/24;
+Semgrep 11/24, 2/24; Ruff 17/24, 4/24. The denominator is 24 for every arm. This
+is the closest the study gets to a head-to-head result, and it still measures
+where findings land, not detection quality. Method, pre-registration and
+caveats are in [the experiment directory](experiments/cross-tool-results.md).
 
 Machine-readable: `data/cross_tool_repo.json` (compact counts). The full
 per-finding file/function lists are kept outside the published tree and can be
