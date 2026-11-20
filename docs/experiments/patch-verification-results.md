@@ -1,6 +1,6 @@
 # Certificate-verified patch repair — results
 
-**Pre-registration:** [paper2-preregistration.md](paper2-preregistration.md),
+**Pre-registration:** [patch-verification-preregistration.md](patch-verification-preregistration.md),
 registered before the first attempt. The analysis below follows it, with the
 deviations recorded in the registration document.
 
@@ -11,14 +11,14 @@ side of the corpus, the advisory identifier or the commit hash. The guard in
 `benchmarks/llm_patch` enforces this mechanically.
 
 ```bash
-python -m benchmarks.llm_patch prepare --dataset data/corpus.jsonl \
-    --json data/llm_patch_prompts.jsonl
-python -m benchmarks.llm_patch collect \
-    --manifest experiments/scratch/llm-patch/manifest.json \
+python -m benchmarks.patch_verification prepare --dataset data/corpus.jsonl \
+    --json data/patch_prompts.jsonl
+python -m benchmarks.patch_verification collect \
+    --manifest experiments/scratch/patch-verification/manifest.json \
     --answers-dir experiments/scratch/llm-patch \
-    --json data/llm_patch_responses.jsonl
-python -m benchmarks.llm_patch verify --dataset data/corpus.jsonl \
-    --responses data/llm_patch_responses.jsonl --json data/llm_patch.json
+    --json data/patch_responses.jsonl
+python -m benchmarks.patch_verification verify --dataset data/corpus.jsonl \
+    --responses data/patch_responses.jsonl --json data/patch_verification.json
 ```
 
 The second step separates generation from verification: the responses are
@@ -26,7 +26,7 @@ files, one per pair, and the generator is a subagent configuration of an LLM
 reached through the agent harness. The generator is **not a fixed public
 checkpoint**, so the responses — not the model — are the artefact of record.
 They embed the corpus's third-party source and are therefore not committed;
-they travel in the frozen archive beside the corpus. `data/llm_patch.json`
+they travel in the frozen archive beside the corpus. `data/patch_verification.json`
 contains the results derived from them, without the source.
 
 ## Population

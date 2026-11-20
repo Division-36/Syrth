@@ -142,7 +142,7 @@ omission.
 
 ## Status
 
-674 tests; how many pass depends on the environment: the export test skips
+680 tests; how many pass depends on the environment: the export test skips
 without a C compiler (`gcc` on Linux runs it instead), and the measurement-table
 and freeze tests skip without `data/corpus.jsonl`, which CI does not generate.
 `ruff check syrth tests benchmarks tools` is clean. CI runs the suite on Ubuntu,

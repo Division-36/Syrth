@@ -1,4 +1,4 @@
-"""The repair experiment must not show the model the answer.
+"""The patch-verification study must not show the model the answer.
 
 The experiment asks a model to fix a vulnerability. The corpus holds the real
 upstream fix next to the vulnerable code, so a prompt that leaks any part of
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.llm_patch import (
+from benchmarks.patch_verification import (
     LeakageError,
     _metadata,
     assert_no_leakage,
@@ -145,10 +145,10 @@ class TestThePreparedPrompts:
         The harness refuses to write a leaky prompt, so this asserts that
         the file on disk is clean too, not only that the guard fired.
         """
-        from benchmarks.llm_patch import _pairs
+        from benchmarks.patch_verification import _pairs
         from benchmarks.run_benchmarks import load_records
 
-        prompts = ROOT / "data" / "llm_patch_prompts.jsonl"
+        prompts = ROOT / "data" / "patch_prompts.jsonl"
         if not prompts.exists():
             pytest.skip("the prompts have not been prepared")
         metadata = _metadata(str(CORPUS))

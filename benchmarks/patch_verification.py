@@ -1,7 +1,7 @@
 """Certificate-verified patch repair: propose a fix, then let the certificate judge it.
 
 This is the experiment registered in
-``docs/experiments/paper2-preregistration.md``. The protocol there is fixed
+``docs/experiments/patch-verification-preregistration.md``. The protocol there is fixed
 before any patch is generated; this module is the instrument that carries it
 out.
 
@@ -27,11 +27,11 @@ wider than the percentages suggest.
 
 Usage::
 
-    python -m benchmarks.llm_patch prepare --dataset data/corpus.jsonl \
-        --json data/llm_patch_prompts.jsonl
-    python -m benchmarks.llm_patch verify --dataset data/corpus.jsonl \
-        --responses data/llm_patch_responses.jsonl \
-        --json data/llm_patch.json
+    python -m benchmarks.patch_verification prepare --dataset data/corpus.jsonl \
+        --json data/patch_prompts.jsonl
+    python -m benchmarks.patch_verification verify --dataset data/corpus.jsonl \
+        --responses data/patch_responses.jsonl \
+        --json data/patch_verification.json
 """
 
 from __future__ import annotations
@@ -557,9 +557,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("step", choices=("prepare", "collect", "verify"))
     parser.add_argument("--dataset", default="data/corpus.jsonl")
-    parser.add_argument("--responses", default="data/llm_patch_responses.jsonl")
-    parser.add_argument("--manifest", default="experiments/scratch/llm-patch/manifest.json")
-    parser.add_argument("--answers-dir", default="experiments/scratch/llm-patch")
+    parser.add_argument("--responses", default="data/patch_responses.jsonl")
+    parser.add_argument("--manifest", default="experiments/scratch/patch-verification/manifest.json")
+    parser.add_argument("--answers-dir", default="experiments/scratch/patch-verification")
     parser.add_argument("--agent", default="opencode subagent")
     parser.add_argument("--json", default=None)
     args = parser.parse_args(argv)

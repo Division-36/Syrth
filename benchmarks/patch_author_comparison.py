@@ -1,6 +1,6 @@
-"""Direct comparison: machine patches vs the real developer patches.
+"""Direct comparison: model-authored patches vs the real developer patches.
 
-The repair experiment judged 57 model answers with a contract. This module
+The patch-verification study judged 57 model answers with a contract. This module
 judges the real upstream patch of the same 57 pairs with the *same* contract,
 so the two arms are directly comparable: same population, same analyser, same
 conditions. It is a descriptive comparison, not a new experiment; no
@@ -8,10 +8,10 @@ hypothesis is tested and no quality claim is made.
 
 Usage::
 
-    python -m benchmarks.repair_compare \
+    python -m benchmarks.patch_author_comparison \
         --dataset data/corpus.jsonl \
-        --responses data/llm_patch_responses.jsonl \
-        --json data/repair_compare.json
+        --responses data/patch_responses.jsonl \
+        --json data/patch_author_comparison.json
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import json
 import pathlib
 from typing import Any
 
-from benchmarks.llm_patch import (
+from benchmarks.patch_verification import (
     MODEL_IDENTIFIER,
     MODEL_PROVIDER,
     _all_trace_ids,
@@ -75,11 +75,11 @@ def _metadata_source_sink(vulnerable: Any) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Compare machine patches with the real developer patches."
+        description="Compare model-authored patches with the real developer patches."
     )
     parser.add_argument("--dataset", default="data/corpus.jsonl")
-    parser.add_argument("--responses", default="data/llm_patch_responses.jsonl")
-    parser.add_argument("--json", default="data/repair_compare.json")
+    parser.add_argument("--responses", default="data/patch_responses.jsonl")
+    parser.add_argument("--json", default="data/patch_author_comparison.json")
     args = parser.parse_args(argv)
 
     records = load_records(args.dataset)

@@ -1,12 +1,12 @@
-# Pre-registration: cross-tool path comparison on full repositories
+# Pre-registration: whole-repository tool comparison on full repositories
 
 **Status:** registered before the first repository scan.
 **Registered:** 2026-11-17.
 **Paper:** the second SYRTH paper, experiment 2. Experiment 1 (certificate-
-verified repair) is registered separately in `paper2-preregistration.md`.
+verified repair) is registered separately in `patch-verification-preregistration.md`.
 
 This document fixes the population, the measures and the analysis before the
-cross-tool scan is run, so that the "we compared against other tools" claim
+whole-repository tool scan is run, so that the "we compared against other tools" claim
 cannot be re-scoped after the numbers are known.
 
 ## 1. The question

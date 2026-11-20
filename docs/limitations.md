@@ -103,7 +103,7 @@ understand those category/sanitiser pairs. The measured patch kill rate is 89%
 
 ## The two new experiments
 
-**The repair experiment is one model at one point in time.** The generator is an
+**The patch-verification study is one model at one point in time.** The generator is an
 agent configuration, not a fixed public checkpoint, and it was not
 seed-controlled. The 31/57 verified-kill rate describes what those 57 answers
 did, not what another model or a rerun would do. Public upstream fixes are a
@@ -113,7 +113,7 @@ verification is reproducible from them without the model. The second attempt
 planned as a self-consistency check was not run; the deviation is recorded in
 the pre-registration.
 
-**The cross-tool comparison measures location, not quality.** Co-location says
+**The tool comparison measures location, not quality.** Co-location says
 a tool's finding and a certificate land at the same file and function. It is not
 precision or recall: there is no negative class, and a tool that models fewer
 classes cannot be penalised as if it had missed them. Bandit, Semgrep and Ruff

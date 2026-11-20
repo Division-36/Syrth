@@ -375,7 +375,7 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "flow_traded",
         "missing_pairs",
     ),
-    "data/llm_patch.json": (
+    "data/patch_verification.json": (
         "dataset",
         "population",
         "attempted",
@@ -386,7 +386,7 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "rates",
         "results",
     ),
-    "data/cross_tool_repo.json": (
+    "data/tool_comparison.json": (
         "dataset",
         "repos",
         "repositories",
@@ -396,13 +396,21 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "per_tool",
         "rows",
     ),
-    "data/repair_compare.json": (
+    "data/patch_author_comparison.json": (
         "dataset",
         "responses",
         "population",
         "compared",
         "contract",
         "arms",
+    ),
+    "data/tool_capability.json": (
+        "populations",
+        "matched_layers",
+        "no_accuracy_claim",
+        "instruments",
+        "strength_profile",
+        "capability_matrix",
     ),
 }
 

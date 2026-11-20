@@ -68,18 +68,16 @@ data/*.json
 !data/identity_rename.json
 !data/patch_study.json
 !data/whole_repo_study.json
-# The repair experiment's results, without the third-party source they were
-# produced from: the prompts and the responses embed corpus code and stay in
-# the frozen archive.
-!data/llm_patch.json
-# The direct comparison of machine patches against the real developer patches,
-# under the same contract on the same 57 pairs.
-!data/repair_compare.json
-# The cross-tool comparison, which backs the tool table in docs/benchmark.md.
-# Published in compact form: every count the docs quote, with the raw
-# file/function lists left in experiments/scratch (the full result is 7.6 MB
-# and is reproducible with `make cross-tool`).
-!data/cross_tool_repo.json
+# Patch-verification study: decisions on model-authored patches, the direct
+# comparison against the real fix, and the matched tool-capability profile.
+# The prompts and responses embed third-party source and stay in the archive.
+!data/patch_verification.json
+!data/patch_author_comparison.json
+!data/tool_capability.json
+# Whole-repository tool comparison in compact form: every count the docs quote.
+# The raw per-finding lists stay in experiments/scratch and are reproducible
+# with `make tool-comparison`.
+!data/tool_comparison.json
 
 # Deliberately NOT published: data/benchmark.json. It reports precision, recall,
 # f1, false_positive_rate and abstention_rate, which are the measurements of the
@@ -137,7 +135,7 @@ experiments/scratch/
 # with its own history, submission state, and (once submitted) a venue's
 # anonymity rules. Tracked in its own repository, not this one.
 paper/
-paper2/
+paper-verification/
 
 # --- Editor / OS ---
 .vscode/

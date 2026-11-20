@@ -1,4 +1,4 @@
-"""The cross-tool comparison's accounting rules.
+"""The tool comparison's accounting rules.
 
 The full scan takes minutes per repository, so these tests cover the parts
 that decide what a result means: the denominator, the co-location rule, and
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from benchmarks.cross_tool_repo import _aggregate, _function_at, _relative, _repositories
+from benchmarks.tool_comparison import _aggregate, _function_at, _relative, _repositories
 
 ROOT = Path(__file__).resolve().parent.parent
 CORPUS = ROOT / "data" / "corpus.jsonl"

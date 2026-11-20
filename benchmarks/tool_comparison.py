@@ -1,6 +1,6 @@
 """Cross-tool comparison on full repositories.
 
-The registered experiment in ``docs/experiments/cross-tool-preregistration.md``.
+The registered experiment in ``docs/experiments/tool-comparison-preregistration.md``.
 Each instrument is pointed at the same 24 repositories at the same fix
 commits, and what it reports is compared by *co-location* with certificates:
 a tool's finding either lands in a file+function where SYRTH emitted a
@@ -9,9 +9,9 @@ negative class here -- and the results are reported with their denominators.
 
 Usage::
 
-    python -m benchmarks.cross_tool_repo \
+    python -m benchmarks.tool_comparison \
         --dataset data/corpus.jsonl --repos experiments/scratch/repos \
-        --json data/cross_tool_repo.json
+        --json data/tool_comparison.json
 """
 
 from __future__ import annotations

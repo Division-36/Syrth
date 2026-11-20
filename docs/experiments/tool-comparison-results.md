@@ -1,6 +1,6 @@
 # Cross-tool comparison on full repositories — results
 
-**Pre-registration:** [cross-tool-preregistration.md](cross-tool-preregistration.md),
+**Pre-registration:** [tool-comparison-preregistration.md](tool-comparison-preregistration.md),
 registered before the first repository scan. The analysis follows it.
 
 The first paper compares instruments on 350 extracted snippets. This experiment
@@ -10,7 +10,7 @@ comparison is **co-location**, not precision or recall — the corpus has no
 reliable negative class, and a different tool's finding is not ground truth.
 
 ```bash
-make cross-tool    # or: python -m benchmarks.cross_tool_repo --json data/cross_tool_repo.json
+make tool-comparison    # or: python -m benchmarks.tool_comparison --json data/tool_comparison.json
 ```
 
 Bandit, Semgrep and Ruff report a file and a line but not the enclosing

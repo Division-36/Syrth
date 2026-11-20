@@ -11,11 +11,31 @@ same number: tag `v1.1`, version `1.1`.
 
 ## Unreleased
 
+### Changed
+
+- All measurement files and harnesses now carry explicit names. The patch
+  verification study is `benchmarks/patch_verification.py` publishing
+  `data/patch_verification.json`; its direct comparison against the real fix is
+  `benchmarks/patch_author_comparison.py` publishing
+  `data/patch_author_comparison.json`; the whole-repository tool comparison is
+  `benchmarks/tool_comparison.py` publishing `data/tool_comparison.json`; and
+  the second paper lives in `paper-verification/` rather than `paper2/`.
+  Prompts and responses are `data/patch_prompts.jsonl` and
+  `data/patch_responses.jsonl`. The Makefile targets are `tool-comparison`,
+  `tool-capability` and `patch-verification`.
+
 ### Added
 
+- `benchmarks/tool_capability_study.py` publishes `data/tool_capability.json`,
+  one matched capability profile across the snippet and whole-tree layers. It
+  states the instrument's strengths as absolute counts on the same population:
+  exact dangerous calls 199/217 against the next best 73/217, vulnerability
+  classes 111/116 against 23/116, advisory functions 14/24 against 4/24, and
+  patch verification decisions 57 against none. These are coverage and
+  verifiability results, not an accuracy or detection-quality claim.
 - Two direct, like-for-like comparisons requested for the second paper.
   `benchmarks/repair_compare.py` judges the real developer patch of each of the
-  57 confirmed pairs with the same contract used for the machine patches:
+  57 confirmed pairs with the same contract used for the model-authored patches:
   machine 31/57 verified kills and 21/57 guard-only, developer 7/57 verified
   kills and 44/57 guard-only. The guard-only difference is not a quality score;
   real fixes more often add a containment guard, which leaves the certificate
@@ -48,15 +68,15 @@ experiments.
   source and the certificate; the certificate judges the answer. 31 of 57
   answers are verified kills, 21 are guard-only fixes the certificate refuses
   although they parse, and 6 introduce a new flow. The method is registered
-  in `docs/experiments/paper2-preregistration.md` before the first attempt,
-  the results in `docs/experiments/patch-repair-results.md`, and the numbers
-  in `data/llm_patch.json`.
+  in `docs/experiments/patch-verification-preregistration.md` before the first attempt,
+  the results in `docs/experiments/patch-verification-results.md`, and the numbers
+  in `data/patch_verification.json`.
 - `benchmarks/llm_patch.py` prepares the prompts (refusing any that carry the
   patched side, the advisory or the commit), collects the recorded answers,
   and verifies each one by re-scanning it and comparing certificates. An
   automated test covers the leakage guard.
 - The second experiment of the second paper, registered in
-  `docs/experiments/cross-tool-preregistration.md`: the four instruments run
+  `docs/experiments/tool-comparison-preregistration.md`: the four instruments run
   on whole worktrees of 24 repositories, one fix commit each. The comparison
   is co-location with certificates at file and function level, not precision
   or recall. `benchmarks/cross_tool_repo.py` checkpoints after each repository
@@ -67,9 +87,9 @@ experiments.
 
 ### Changed
 
-- `benchmarks/verify_published.py` also checks the repair experiment's
+- `benchmarks/verify_published.py` also checks the patch-verification study's
   published results.
-- `make cross-tool` runs the whole-tree comparison.
+- `make tool-comparison` runs the whole-tree comparison.
 - The documentation was restructured for a first-time reader: `docs/README.md`
   now opens with a reading guide, a one-paragraph description and a table of
   every headline number with a link to its detail; `docs/benchmark.md` has a
@@ -163,7 +183,7 @@ whole-repository replay, and the analyser fix that made the replay possible.
 - `syrth.parser.python.parameter_is_source` is a single documented seam that
   lets the ablation harness disable the position-seeded source rule without
   editing the analyser. Nothing in the product overrides it.
-- The documentation quotes 674 tests, states that skips are
+- The documentation quotes 680 tests, states that skips are
   environment-dependent, and adds a whole-repository section to
   [benchmark.md](benchmark.md).
 - The paper sources are excluded from the tree: the manuscript is a separate

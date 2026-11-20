@@ -1,6 +1,6 @@
 """The direct comparison must use the same contract on both arms.
 
-The comparison between machine patches and the real developer patches is only
+The comparison between model-authored patches and the real developer patches is only
 meaningful if both arms are judged by the same code on the same source. These
 tests cover the accounting, so a later refactor cannot silently score one arm
 with different rules.
@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RESULT = ROOT / "data" / "repair_compare.json"
+RESULT = ROOT / "data" / "patch_author_comparison.json"
 
 
 class TestDirectComparison:

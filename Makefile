@@ -31,13 +31,14 @@ FILE ?=
 
 .PHONY: help install install-dev install-benchmark test test-verbose lint \
         check scan scan-json scan-sarif fix diff bench competitors corpus \
-        patch-study ablation identity whole-repo verify-published cross-tool \
+        patch-study ablation identity whole-repo verify-published \
+        tool-comparison tool-capability patch-verification \
         train export-smoke docs-check build clean clean-windows
 
 help:
 	@echo "make check | test | lint | scan FILE= | bench | competitors | corpus"
 	@echo "make patch-study | ablation | identity | whole-repo | verify-published"
-	@echo "make cross-tool"
+	@echo "make tool-comparison | tool-capability | patch-verification"
 
 install:
 	$(PYTHON) -m pip install -e .
@@ -122,14 +123,32 @@ whole-repo:
 verify-published:
 	$(PYTHON) -m benchmarks.verify_published --dataset $(DATASET)
 
-# The second paper's cross-tool scan: one fix commit per repository, whole
+# Whole-repository tool comparison: one fix commit per repository, whole
 # worktrees, four instruments. Needs bandit, semgrep and ruff on PATH, plus
 # the repositories under experiments/scratch/repos. Takes minutes; the JSON
 # is a checkpoint, so a killed run resumes at the last finished repository.
-cross-tool:
-	$(PYTHON) -m benchmarks.cross_tool_repo --dataset $(DATASET) \
+tool-comparison:
+	$(PYTHON) -m benchmarks.tool_comparison --dataset $(DATASET) \
 		--repos experiments/scratch/repos \
-		--json data/cross_tool_repo.json
+		--json data/tool_comparison.json
+
+# Consolidate both matched comparisons into one capability profile, with the
+# strength margins stated in absolute counts on the same population.
+tool-capability:
+	$(PYTHON) -m benchmarks.tool_capability_study \
+		--competitors data/competitor_benchmark.json \
+		--trees data/tool_comparison.json \
+		--json data/tool_capability.json
+
+# Re-derive the patch-verification study from its recorded answers. The raw
+# answers embed third-party source and are not committed; see the study doc.
+patch-verification:
+	$(PYTHON) -m benchmarks.patch_verification verify --dataset $(DATASET) \
+		--responses data/patch_responses.jsonl \
+		--json data/patch_verification.json
+	$(PYTHON) -m benchmarks.patch_author_comparison --dataset $(DATASET) \
+		--responses data/patch_responses.jsonl \
+		--json data/patch_author_comparison.json
 
 train:
 	$(PYTHON) -m syrth.train --dataset $(DATASET)

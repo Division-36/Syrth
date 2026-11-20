@@ -30,6 +30,39 @@ Precision and recall are not defined for it. See [risk-model.md](risk-model.md).
 | **determinism** | does a repeat scan of identical input produce identical output? |
 | **certificate-verified repair** | when a model proposes the fix, does the certificate still refuse the patches that only add a guard? |
 | **cross-tool co-location** | on whole repositories, do other tools' findings land where SYRTH's certificates are? |
+| **matched capability profile** | on the same populations, where does each instrument lead in absolute counts? |
+
+## Where the instrument is strongest
+
+This is the direct, matched answer. All four rows are measured on the same
+population with the same ground truth or the same advisory location. The
+margin is an absolute count, not an accuracy difference.
+
+| Dimension | SYRTH | Next best | Margin |
+|---|---|---|---|
+| Exact dangerous calls examined | 199/217 | 73/217 (Ruff) | +126 |
+| Vulnerability classes named | 111/116 | 23/116 (Bandit) | +88 |
+| Advisory function covered | 14/24 | 4/24 (Ruff) | +10 |
+| Patch verification decisions | 57 | none | — |
+
+Three specifics:
+
+- **It looks at the exact dangerous call, not merely the file.** Sink coverage
+  asks whether the instrument examined the specific call the independent AST
+  scan proves is present. 199/217 against Ruff's 73/217 is the strongest result
+  and follows from the design: the registry names the sink class before any
+  taint decision, so a contact is named even when a flow is not confirmed.
+- **It names classes other instruments do not model.** Two Semgrep
+  configurations name none of the seven classes in scope. A zero means the rule
+  set does not model the class, not that the tool missed findings.
+- **It can decide a patch.** Only SYRTH emits a source-to-sink path with a stable
+  identity, so only it can verify that a patch removed the targeted flow:
+  57 decisions here. The others emit a location, not a checkable object.
+
+These are strengths of **coverage and verifiability**, not detection accuracy.
+The corpus has no reliable negative class, and no claim is made that SYRTH finds
+more real vulnerabilities. The single command that produces this profile is
+`make tool-capability`, published as `data/tool_capability.json`.
 
 ### Which command produces which number
 
@@ -44,8 +77,8 @@ result is published next to the documentation that quotes it.
 | the component ablation | `python -m benchmarks.ablation --dataset data/corpus.jsonl` | `data/ablation.json` |
 | the real-commit patch study | `python -m benchmarks.patch_study --dataset data/corpus.jsonl` | `data/patch_study.json` |
 | the whole-repository replay | `python -m benchmarks.whole_repo_study --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/whole_repo_study.json` |
-| certificate-verified repair | `python -m benchmarks.llm_patch prepare ... && python -m benchmarks.llm_patch collect ... && python -m benchmarks.llm_patch verify ...` | `data/llm_patch.json` |
-| cross-tool comparison | `python -m benchmarks.cross_tool_repo --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/cross_tool_repo.json` |
+| certificate-verified repair | `python -m benchmarks.patch_verification prepare ... && python -m benchmarks.patch_verification collect ... && python -m benchmarks.patch_verification verify ...` | `data/patch_verification.json` |
+| tool comparison | `python -m benchmarks.tool_comparison --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/tool_comparison.json` |
 
 The whole-repository replay needs the repositories checked out under
 `experiments/scratch/repos` and takes hours; the rest run in seconds. The
@@ -538,7 +571,7 @@ labelled flow is confirmed. A model sees the vulnerable source and the
 certificate — never the real fix, the advisory, the commit or the repository
 name — and returns a corrected file. The certificate judges the answer; the
 diff never does. Full method, pre-registration and results are in
-[the experiment directory](experiments/patch-repair-results.md).
+[the experiment directory](experiments/patch-verification-results.md).
 
 | Outcome | Pairs | Meaning |
 | --- | --- | --- |
@@ -563,8 +596,8 @@ and 44/57 guard-only. The guard-only difference is not a quality score — real
 fixes often add a containment guard, which leaves the certificate standing by
 design. Both arms share the population, the analyser and the conditions.
 
-Machine-readable: `data/llm_patch.json` (results and rates only, no source),
-`data/repair_compare.json` (the direct comparison).
+Machine-readable: `data/patch_verification.json` (results and rates only, no source),
+`data/patch_author_comparison.json` (the direct comparison).
 
 ## Cross-tool comparison on full worktrees
 
@@ -593,10 +626,10 @@ like-for-like result: SYRTH 23/24 file, 14/24 function; Bandit 17/24, 3/24;
 Semgrep 11/24, 2/24; Ruff 17/24, 4/24. The denominator is 24 for every arm. This
 is the closest the study gets to a head-to-head result, and it still measures
 where findings land, not detection quality. Method, pre-registration and
-caveats are in [the experiment directory](experiments/cross-tool-results.md).
+caveats are in [the experiment directory](experiments/tool-comparison-results.md).
 
-Machine-readable: `data/cross_tool_repo.json` (compact counts). The full
+Machine-readable: `data/tool_comparison.json` (compact counts). The full
 per-finding file/function lists are kept outside the published tree and can be
-regenerated with `make cross-tool`.
+regenerated with `make tool-comparison`.
 
 ---
