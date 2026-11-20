@@ -1,25 +1,21 @@
-# Changelog
-
-All notable changes to this project are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-The first release used a named channel (`v1-prod`, packaged as `1.0.0+prod`,
-because PEP 440 can only carry `prod` as a local version segment after a `+`).
-From 1.1 onward the tag, the release title and the packaged version are the
-same number: tag `v1.1`, version `1.1`.
-
 ## Unreleased
 
 ### Changed
 
+- `benchmarks/verify_published` now fails when a published file points at a
+  missing path, and `make verify-published` re-derives the two patch-verification
+  measurements from their recorded responses (the field was stale since the
+  rename).
+- `benchmarks/tool_capability_study` records a warning when an instrument
+  lacks capability or measurement data, and records zero-denominator rates
+  explicitly rather than reporting them as if measured.
 - All measurement files and harnesses now carry explicit names. The patch
   verification study is `benchmarks/patch_verification.py` publishing
   `data/patch_verification.json`; its direct comparison against the real fix is
   `benchmarks/patch_author_comparison.py` publishing
   `data/patch_author_comparison.json`; the whole-repository tool comparison is
   `benchmarks/tool_comparison.py` publishing `data/tool_comparison.json`; and
-  the second paper lives in `paper-verification/` rather than `paper2/`.
+  the second paper lives in `paper-verification/`.
   Prompts and responses are `data/patch_prompts.jsonl` and
   `data/patch_responses.jsonl`. The Makefile targets are `tool-comparison`,
   `tool-capability` and `patch-verification`.
@@ -34,7 +30,7 @@ same number: tag `v1.1`, version `1.1`.
   patch verification decisions 57 against none. These are coverage and
   verifiability results, not an accuracy or detection-quality claim.
 - Two direct, like-for-like comparisons requested for the second paper.
-  `benchmarks/repair_compare.py` judges the real developer patch of each of the
+  `benchmarks/patch_author_comparison.py` judges the real developer patch of each of the
   57 confirmed pairs with the same contract used for the model-authored patches:
   machine 31/57 verified kills and 21/57 guard-only, developer 7/57 verified
   kills and 44/57 guard-only. The guard-only difference is not a quality score;
@@ -63,7 +59,7 @@ experiments.
 
 ### Added
 
-- The first experiment of the second paper: certificate-verified patch repair
+- The first experiment of the second paper: certificate-verified patch verification
   on the 57 pairs with a confirmed flow. A model sees only the vulnerable
   source and the certificate; the certificate judges the answer. 31 of 57
   answers are verified kills, 21 are guard-only fixes the certificate refuses
@@ -71,7 +67,7 @@ experiments.
   in `docs/experiments/patch-verification-preregistration.md` before the first attempt,
   the results in `docs/experiments/patch-verification-results.md`, and the numbers
   in `data/patch_verification.json`.
-- `benchmarks/llm_patch.py` prepares the prompts (refusing any that carry the
+- `benchmarks/patch_verification.py` prepares the prompts (refusing any that carry the
   patched side, the advisory or the commit), collects the recorded answers,
   and verifies each one by re-scanning it and comparing certificates. An
   automated test covers the leakage guard.
@@ -79,9 +75,9 @@ experiments.
   `docs/experiments/tool-comparison-preregistration.md`: the four instruments run
   on whole worktrees of 24 repositories, one fix commit each. The comparison
   is co-location with certificates at file and function level, not precision
-  or recall. `benchmarks/cross_tool_repo.py` checkpoints after each repository
+  or recall. `benchmarks/tool_comparison.py` checkpoints after each repository
   and resumes from the JSON file.
-- `benchmarks/cross_tool_repo.py` derives the enclosing function for external
+- `benchmarks/tool_comparison.py` derives the enclosing function for external
   tools' findings from the source at their reported line, because Bandit,
   Semgrep and Ruff report a file and a line but not a function name.
 
@@ -100,45 +96,7 @@ experiments.
   two new experiments and replaces the "performance unmeasured" claim with the
   whole-repository cost actually observed.
 
-## v1-prod — 2026-10-27
-
-**First production release of the rewritten public history.** The analyser is
-functionally the same as the withdrawn 1.0.1; what changed is what the repository
-publishes.
-
-### Removed
-
-- Internal working material is gone from the repository and from its history:
-  project-state notes, agent-facing instructions, personal working preferences,
-  raw prompt transcripts, and machine-specific paths.
-- The unpublished paper and its source are gone from the tree and from history.
-  The withdrawal record survives as [withdrawn-v1.md](withdrawn-v1.md), rewritten
-  so that it does not depend on files the repository no longer holds.
-- The retired v1 pipeline, its benchmark artefacts and its plots are gone from
-  history. They advertised accuracy figures that the audit withdrew.
-- Superseded v1 documentation is gone. It repeated those figures behind a
-  withdrawal banner, which kept the claims in circulation without keeping the
-  evidence.
-- `docs/measurements.md` is gone. It published precision and recall from the
-  classifier era, and this project publishes no precision or recall figure.
-
-### Changed
-
-- Commit metadata is normalised: no personal email address is published in the
-  history.
-- `README.md`, `docs/README.md`, `docs/limitations.md` and `docs/CONTRIBUTING.md`
-  now quote the current measurements and the current CI matrix. Several of them
-  had drifted to the pre-rewrite numbers.
-- The version is single-sourced at 1.0.0+prod across `pyproject.toml`,
-  `syrth/__init__.py` and `syrth/scan.py`.
-
-### Withdrawn
-
-- Releases 1.0.0 and 1.0.1 are withdrawn. Their artefacts described a tree that
-  is no longer published, and `v1-prod` replaces them. No code change requires a
-  migration: the CLI, the Python API and the rule set are unchanged.
-
-## v1.1-measurement — 2026-11-10
+## v1.1-measurement — 2026-11-10 (pre-release, superseded by v1.1)
 
 The measurement evidence release: the four patch and identity studies, the
 whole-repository replay, and the analyser fix that made the replay possible.
@@ -204,4 +162,44 @@ whole-repository replay, and the analyser fix that made the replay possible.
   (`start` is defined 172 times in salt at one revision), which is why the
   whole-repository study pins cross-function matches to the labelled file as
   well as the labelled name.
+
+## v1-prod — 2026-10-27
+
+**First production release of the rewritten public history.** The analyser is
+functionally the same as the withdrawn 1.0.1; what changed is what the repository
+publishes.
+
+### Removed
+
+- Internal working material is gone from the repository and from its history:
+  project-state notes, agent-facing instructions, personal working preferences,
+  raw prompt transcripts, and machine-specific paths.
+- The unpublished paper and its source are gone from the tree and from history.
+  The withdrawal record survives as [withdrawn-v1.md](withdrawn-v1.md), rewritten
+  so that it does not depend on files the repository no longer holds.
+- The retired v1 pipeline, its benchmark artefacts and its plots are gone from
+  history. They advertised accuracy figures that the audit withdrew.
+- Superseded v1 documentation is gone. It repeated those figures behind a
+  withdrawal banner, which kept the claims in circulation without keeping the
+  evidence.
+- `docs/measurements.md` is gone. It published precision and recall from the
+  classifier era, and this project publishes no precision or recall figure.
+
+### Changed
+
+- Commit metadata in the reviewed history is normalised to a neutral address
+  (`syrth@division-36.local`); the author's public address
+  (`ziad salah <zs.01117875692@gmail.com>`) appears on later commits, since the
+  study is published under the author's own name.
+- `README.md`, `docs/README.md`, `docs/limitations.md` and `docs/CONTRIBUTING.md`
+  now quote the current measurements and the current CI matrix. Several of them
+  had drifted to the pre-rewrite numbers.
+- The version is single-sourced at 1.0.0+prod across `pyproject.toml`,
+  `syrth/__init__.py` and `syrth/scan.py`.
+
+### Withdrawn
+
+- Releases 1.0.0 and 1.0.1 are withdrawn. Their artefacts described a tree that
+  is no longer published, and `v1-prod` replaces them. No code change requires a
+  migration: the CLI, the Python API and the rule set are unchanged.
 

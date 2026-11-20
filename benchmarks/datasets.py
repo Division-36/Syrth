@@ -11,6 +11,11 @@ Expected formats:
 - RealVuln JSONL:  ``{"code": "...", "label": 0/1, ...}``
 
 Place datasets under ``datasets/<name>`` (see project README / docs).
+
+The loaders deliberately describe formats only: this project does not commit
+the external dataset files (BigVul, Devign, RealVuln), and the docstrings make
+that explicit so no file-size expectation is hidden. When the file is absent
+the loaders generate a deterministic synthetic fallback.
 """
 
 from __future__ import annotations

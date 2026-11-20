@@ -93,6 +93,22 @@ def build(competitors: dict[str, Any], trees: dict[str, Any]) -> dict[str, Any]:
     def count_of(name: str, path: tuple[str, str]) -> int:
         return int(instruments[name][path[0]][path[1]]["count"])
 
+    warnings: list[str] = []
+    zero_denominators: list[str] = []
+    for name in INSTRUMENTS:
+        missing = [key for key, value in instruments[name]["capability"].items() if not value]
+        if not instruments[name]["snippet"]:
+            missing.append("snippet layer")
+        if not instruments[name]["tree"]:
+            missing.append("tree layer")
+        if missing:
+            warnings.append(f"{LABELS[name]} lacks capability/measurement data: {', '.join(missing)}")
+    for name, row in instruments.items():
+        for layer in ("snippet", "tree"):
+            for key, value in row[layer].items():
+                if isinstance(value, dict) and value.get("of") == 0:
+                    zero_denominators.append(f"{name}.{layer}.{key} has a zero denominator")
+
     leads = {
         "sink_coverage": {
             "leader": LABELS["syrth"],
@@ -135,6 +151,8 @@ def build(competitors: dict[str, Any], trees: dict[str, Any]) -> dict[str, Any]:
         "instruments": instruments,
         "strength_profile": leads,
         "capability_matrix": CAPABILITIES,
+        "warnings": warnings,
+        "zero_denominators": zero_denominators,
     }
 
 
@@ -164,6 +182,9 @@ def _render(result: dict[str, Any]) -> str:
             f"next best {lead['next_best']}/{lead['population']}, "
             f"margin +{lead['margin']}"
         )
+    lines.append("")
+    for warning in result.get("warnings", []):
+        lines.append(f"warning: {warning}")
     return "\n".join(lines)
 
 

@@ -1,4 +1,4 @@
-# Certificate-verified patch repair — results
+# Certificate-verified patch verification — results
 
 **Pre-registration:** [patch-verification-preregistration.md](patch-verification-preregistration.md),
 registered before the first attempt. The analysis below follows it, with the
@@ -70,7 +70,7 @@ between each proposed change and the real upstream change to be reported:
 
 The high-similarity tail is real, but it is not the majority: most proposed
 changes are not copies of the upstream fix. The 31 verified kills must still
-be read as "the model repaired the flow under these conditions", not as
+be read as "the model fixed the flow under these conditions", not as
 "the model discovered a novel fix".
 
 ## By class

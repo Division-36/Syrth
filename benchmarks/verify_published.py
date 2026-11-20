@@ -114,6 +114,22 @@ CHECKS: tuple[Check, ...] = (
         "benchmarks.patch_study",
         ("--dataset", "{dataset}"),
     ),
+    Check(
+        "patch verification",
+        "data/patch_verification.json",
+        "benchmarks.patch_verification",
+        ("verify", "--dataset", "{dataset}"),
+    ),
+    Check(
+        "patch author comparison",
+        "data/patch_author_comparison.json",
+        "benchmarks.patch_author_comparison",
+        ("--dataset", "{dataset}"),
+    ),
+    # The whole-repository tool comparison is deliberately not re-derived
+    # here: it rescans all 24 worktrees, taking ~25 minutes. Its published
+    # file is instead checked in `_verify_published_files` (keys, fields and
+    # invariants), and a full re-scan is `make tool-comparison`.
 )
 
 
@@ -411,6 +427,8 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "instruments",
         "strength_profile",
         "capability_matrix",
+        "warnings",
+        "zero_denominators",
     ),
 }
 
@@ -440,6 +458,17 @@ def _verify_published_files(root: pathlib.Path) -> tuple[str, list[str]]:
         missing = [key for key in keys if key not in document]
         if missing:
             notes.append(f"{name}: missing {', '.join(missing)}")
+        for key in keys:
+            value = document.get(key)
+            if not isinstance(value, str):
+                continue
+            if value.endswith(".jsonl") or value.endswith(".json"):
+                candidate = root / value.replace("\\", "/")
+                # When verifying against a copy of the tree, the corpus may
+                # legitimately be absent; against the repository itself it must
+                # be present, or a published file points at nothing.
+                if root == REPO_ROOT and not candidate.exists():
+                    notes.append(f"{name}: records path {value} does not exist")
     if notes:
         return "MISMATCH", notes
     status, extra = _verify_whole_repository(

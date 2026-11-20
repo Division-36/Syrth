@@ -1,4 +1,4 @@
-"""Certificate-verified patch repair: propose a fix, then let the certificate judge it.
+"""Certificate-verified patch verification: propose a fix, then let the certificate judge it.
 
 This is the experiment registered in
 ``docs/experiments/patch-verification-preregistration.md``. The protocol there is fixed
@@ -553,7 +553,7 @@ def collect(manifest_path: str, answers_dir: str, output: str, agent: str) -> in
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Certificate-verified patch repair."
+        description="Certificate-verified patch verification."
     )
     parser.add_argument("step", choices=("prepare", "collect", "verify"))
     parser.add_argument("--dataset", default="data/corpus.jsonl")

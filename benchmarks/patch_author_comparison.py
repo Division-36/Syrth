@@ -82,6 +82,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", default="data/patch_author_comparison.json")
     args = parser.parse_args(argv)
 
+    if not pathlib.Path(args.responses).exists():
+        raise SystemExit(
+            f"no recorded responses at {args.responses}: the generator must "
+            "record its answers before the comparison is measured"
+        )
     records = load_records(args.dataset)
     meta = _metadata(args.dataset)
     by_pair = {v.pair_id: (v, p) for v, p in _pairs(records)}

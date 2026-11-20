@@ -116,7 +116,7 @@ meant to remove still holds.
 | Does its own mitigation remove a confirmed flow? | 89/100 | [benchmark.md#the-kill-rate-question-adjudicated](benchmark.md#the-kill-rate-question-adjudicated) |
 | What happens to the certificate under a real fix? | 46/54 persist, 7 removed, 1 traded | [benchmark.md#real-commit-patch-study](benchmark.md#real-commit-patch-study) |
 | What happens at repository scale? | 57 traced: 50 persist, 6 removed, 1 traded | [benchmark.md#whole-repository-patch-study](benchmark.md#whole-repository-patch-study) |
-| Does a machine's patch pass the certificate? | 31/57 verified kills, 21 guard-only refusals | [benchmark.md#certificate-verified-patch-repair](benchmark.md#certificate-verified-patch-repair) |
+| Does a machine's patch pass the certificate? | 31/57 verified kills, 21 guard-only refusals | [benchmark.md#certificate-verified-patch-verification](benchmark.md#certificate-verified-patch-verification) |
 | Where do other tools' findings land on whole trees? | [benchmark.md#cross-tool-comparison-on-full-worktrees](benchmark.md#cross-tool-comparison-on-full-worktrees) | co-location, not precision |
 
 Every number is `n/N` with its denominator. **None of these is an accuracy

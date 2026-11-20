@@ -127,7 +127,7 @@ numerator. One fix commit per repository was sampled in corpus order, not all
 
 A whole-repository scan was measured on one machine: 15,478 s of scanner time
 over 88 fix commits and 24 repositories, with the largest revision at 3,795
-files, 46,269 functions and 535,936 certificates. That is a cost observation,
+files and 535,936 certificates. That is a cost observation,
 not a throughput claim — the machine, pruning rules and revision sizes are
 part of the number. Pathological input is bounded: a 5000-term expression and
 600-level nesting complete where they previously crashed. Memory was not

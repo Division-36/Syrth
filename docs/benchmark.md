@@ -28,7 +28,7 @@ Precision and recall are not defined for it. See [risk-model.md](risk-model.md).
 | **kill rate** | does the category's own mitigation remove the confirmed flow? |
 | **patch study** | applying the corpus's *real* fix commits: does the labelled flow's certificate survive, get removed, or get replaced? |
 | **determinism** | does a repeat scan of identical input produce identical output? |
-| **certificate-verified repair** | when a model proposes the fix, does the certificate still refuse the patches that only add a guard? |
+| **certificate-verified patch verification** | when a model proposes the fix, does the certificate still refuse the patches that only add a guard? |
 | **cross-tool co-location** | on whole repositories, do other tools' findings land where SYRTH's certificates are? |
 | **matched capability profile** | on the same populations, where does each instrument lead in absolute counts? |
 
@@ -77,7 +77,7 @@ result is published next to the documentation that quotes it.
 | the component ablation | `python -m benchmarks.ablation --dataset data/corpus.jsonl` | `data/ablation.json` |
 | the real-commit patch study | `python -m benchmarks.patch_study --dataset data/corpus.jsonl` | `data/patch_study.json` |
 | the whole-repository replay | `python -m benchmarks.whole_repo_study --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/whole_repo_study.json` |
-| certificate-verified repair | `python -m benchmarks.patch_verification prepare ... && python -m benchmarks.patch_verification collect ... && python -m benchmarks.patch_verification verify ...` | `data/patch_verification.json` |
+| certificate-verified patch verification | `python -m benchmarks.patch_verification prepare ... && python -m benchmarks.patch_verification collect ... && python -m benchmarks.patch_verification verify ...` | `data/patch_verification.json` |
 | tool comparison | `python -m benchmarks.tool_comparison --dataset data/corpus.jsonl --repos experiments/scratch/repos` | `data/tool_comparison.json` |
 
 The whole-repository replay needs the repositories checked out under
@@ -224,9 +224,11 @@ reported.
 
 ### What the survivors are, and what they are not
 
-56 patched functions still report their class. That number is the measurement. It is
-**not** a false-positive count, and reading it as one is the error this section used
-to make.
+The majority of fix records keep the certificate standing, and the supported figure is
+what the competitor table publishes: of the 74 patches the instrument detects, 66 are
+still flagged after the fix (`data/competitor_benchmark.json`). That number is the
+measurement. It is **not** a false-positive count, and reading it as one is the error
+this section used to make.
 
 A finding that persists after a patch is one of three things:
 
@@ -331,7 +333,9 @@ present, not what each tool could in principle find.
 - **Ruff's `0/116` is a metadata gap, not an absence of findings.** Its 111 findings
   carry no CWE. It is in the table because excluding an instrument that finds real
   sinks would flatter everyone else, and on the axis it can be scored on it reaches
-  **33.6%** -- second only to SYRTH, and 16x faster than Semgrep.
+  **33.6%** -- second only to SYRTH. It reaches it in a fraction of the time: a
+  0.2 s scan against Semgrep's 19.5--99.0 s, each number with its own
+  denominator.
 - **One class both tools model well is close.** On CWE-502, SYRTH covers 15/15
   and Bandit 14/15. Quoting only the totals hides how narrow that gap is.
 - **The mitigation columns are the interesting ones and they are unflattering.**
@@ -521,8 +525,8 @@ commit, so a killed run resumes without rescanning finished commits.
 
 All 88 fix commits across 24 repositories were scanned: 175/175 pairs,
 `missing_pairs=0`, 15,478 s of scanner time. The largest revision is salt's, at
-3,795 files, 46,269 functions, and 535,936 certificates. The labelled class
-traces on the vulnerable side in 57 pairs:
+3,795 files and 535,936 certificates. The labelled class traces on the
+vulnerable side in 57 pairs:
 
 | Outcome | Pairs | Meaning |
 | --- | --- | --- |
@@ -563,7 +567,7 @@ cross-function counts, the patched-file check, and the repo-wide introduced
 count; the top level records the partition and the by-class, by-repository, and
 by-tier splits.
 
-## Certificate-verified patch repair
+## Certificate-verified patch verification
 
 What happens when a machine, rather than a developer, writes the fix? The
 second paper's first experiment asks that question on the 57 pairs whose

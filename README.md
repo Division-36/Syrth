@@ -146,7 +146,7 @@ model saw only the vulnerable source and the certificate, and 21 of its patches
 parsed cleanly while leaving the targeted flow standing — the certificate
 refused them. Separately, on whole worktrees of 24 repositories, the four tools'
 findings were compared by where they land, not by which is "better":
-[both experiments](docs/benchmark.md#certificate-verified-patch-repair) are
+[both experiments](docs/benchmark.md#certificate-verified-patch-verification) are
 published with their pre-registrations and denominators.
 
 Every published number is re-derivable: `make verify-published` runs each

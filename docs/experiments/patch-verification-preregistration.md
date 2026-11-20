@@ -1,6 +1,6 @@
 # Pre-registration: certificate-verified patch repair
 
-**Status:** registered before any repair attempt was run.
+**Status:** registered before any fix attempt was run.
 **Registered:** 2026-11-11, in the commit that adds this document (the tag
 `v1.1-measurement` is the state of the tree the experiment was designed
 against).
@@ -38,7 +38,7 @@ This experiment asks that question with a machine as the patch author.
   share, and the share may be zero.*
 * **H2 (the flow goes).** Certificate-verified kills occur for a substantial
   share of the confirmed flows.
-* **H3 (repairs introduce flows).** Some proposed patches remove the targeted
+* **H3 (fixes introduce flows).** Some proposed patches remove the targeted
   flow and introduce a new flow of the same class in the same function.
 
 Each hypothesis is reported with the number of attempts behind it. A
@@ -95,7 +95,7 @@ therefore also reports, for every attempt, the similarity between the proposed
 change and the real upstream change, so that the share of attempts that
 reproduce the upstream fix is visible rather than assumed absent. A result
 whose mean similarity is high must be read as "the model reproduced a known
-fix", not as "the model repaired a vulnerability".
+fix", not as "the model fixed a vulnerability".
 
 ## 5. The model
 
@@ -171,7 +171,7 @@ appears.
 
 If the certificate-verified kill rate is low, or if most refusals are
 guard-only fixes, that is the finding: the certificate refuses patches that
-parse and that a file-level check would accept, and the repair itself is hard.
+parse and that a file-level check would accept, and the fix itself is hard.
 Both outcomes are publishable, and the pre-registration exists so that
 neither can be re-scoped after the fact.
 

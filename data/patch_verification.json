@@ -1,6 +1,6 @@
 {
   "dataset": "data/corpus.jsonl",
-  "responses": "data/llm_patch_responses.jsonl",
+  "responses": "data/patch_responses.jsonl",
   "population": 175,
   "attempted": 57,
   "not_attempted": 118,

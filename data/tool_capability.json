@@ -221,5 +221,13 @@
       "identity": false,
       "verification": false
     }
-  }
+  },
+  "warnings": [
+    "Bandit 1.9.4 lacks capability/measurement data: path, identity, verification",
+    "Semgrep 1.180.0 (security-audit) lacks capability/measurement data: path, identity, verification",
+    "Ruff 0.16.10 (--select S) lacks capability/measurement data: path, identity, verification"
+  ],
+  "zero_denominators": [
+    "ruff.snippet.fix_noticed has a zero denominator"
+  ]
 }

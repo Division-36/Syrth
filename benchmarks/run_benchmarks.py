@@ -46,13 +46,21 @@ reviewer deserves to know.
 What this harness deliberately does not do
 ------------------------------------------
 It does not report a single headline accuracy figure, and it does not compare
-against other tools without running them. Quoted baselines are worthless; run
-them with :mod:`benchmarks.baselines`.
+against other tools without running them; that comparison lives in
+:mod:`benchmarks.competitors`, which runs the same corpus through Bandit and
+Semgrep and scores the instrument-visible part of each finding.
 
 Usage::
 
-    python -m benchmarks.run_benchmarks --dataset data/records.jsonl
-    python -m benchmarks.run_benchmarks --dataset data/records.jsonl --json out.json
+    python -m benchmarks.run_benchmarks --dataset data/corpus.jsonl --json out.json
+
+``benchmarks.run_benchmarks`` is the withdrawn v1 classifier-era harness. Its
+precision and recall numbers are not published (see docs/withdrawn-v1.md); the
+numbers this project publishes -- coverage, rank agreement, rename invariance,
+kill rate and determinism -- are produced by :mod:`benchmarks.risk_metrics` and
+the harnesses in ``benchmarks/`` for the patch, identity, ablation and
+capability studies. This module is retained as the shared library for the
+corpus loaders and renamer used by those harnesses.
 """
 
 from __future__ import annotations
