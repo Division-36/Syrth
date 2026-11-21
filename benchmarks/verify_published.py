@@ -475,6 +475,16 @@ def _verify_published_files(root: pathlib.Path) -> tuple[str, list[str]]:
                 # else referenced must exist.
                 if value.replace("\\", "/").endswith(("corpus.jsonl", "records.jsonl")):
                     continue
+                # Source-bearing files (recorded answers and prompts) are
+                # deliberately not committed; the tree and the published
+                # results do not record where a reader would find them, so
+                # requiring them would fail on every fresh clone. The two
+                # names are the ones the patch-verification study records.
+                if value.replace("\\", "/").rsplit("/", 1)[-1] in {
+                    "patch_responses.jsonl",
+                    "patch_prompts.jsonl",
+                }:
+                    continue
                 candidate = root / value.replace("\\", "/")
                 if root == REPO_ROOT and not candidate.exists():
                     notes.append(f"{name}: records path {value} does not exist")
