@@ -2,8 +2,8 @@
 
 **Status:** registered before the first repository scan.
 **Registered:** 2026-11-17.
-**Paper:** the second SYRTH paper, experiment 2. Experiment 1 (certificate-
-verified repair) is registered separately in `patch-verification-preregistration.md`.
+**Paper:** the second SYRTH paper, experiment 2. Experiment 1 (certificate-verified
+patch verification) is registered separately in `patch-verification-preregistration.md`.
 
 This document fixes the population, the measures and the analysis before the
 whole-repository tool scan is run, so that the "we compared against other tools" claim
