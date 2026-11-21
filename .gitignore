@@ -136,6 +136,7 @@ experiments/scratch/
 # anonymity rules. Tracked in its own repository, not this one.
 paper/
 paper-verification/
+paper-single/
 
 # --- Editor / OS ---
 .vscode/
