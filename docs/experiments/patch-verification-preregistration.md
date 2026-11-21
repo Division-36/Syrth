@@ -1,4 +1,4 @@
-# Pre-registration: certificate-verified patch repair
+# Pre-registration: certificate-verified patch verification
 
 **Status:** registered before any fix attempt was run.
 **Registered:** 2026-11-11, in the commit that adds this document (the tag
@@ -75,7 +75,7 @@ The prompt **must not** contain, in whole or in part:
 * the repository name, in the prompt's instructions.
 
 The repository name may appear *inside the vulnerable source*, because the
-source is the code under repair and its own imports name the project — a
+source is the code under test and its own imports name the project — a
 Django module says "django". Removing it would mean editing the code the
 model is asked to fix, so it stays, and it is part of the memorisation
 confound below.

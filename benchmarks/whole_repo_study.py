@@ -344,6 +344,10 @@ def _aggregate(
         "scan_seconds_total": round(
             sum(commit["scan_seconds"] for commit in commit_results), 2
         ),
+        # Repositories the study scanned, not only those whose traces are
+        # published in by_repo, so a reader can ask how much of the tree the
+        # study covered.
+        "scanned_repositories": sorted({commit["repo"] for commit in commit_results}),
     }
     return {
         **stats,

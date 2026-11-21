@@ -8,14 +8,14 @@ This experiment asks the question the first paper leaves open: when a model
 proposes a fix, does certificate-based verification change the verdict? The
 model saw only the vulnerable source and the certificate — never the patched
 side of the corpus, the advisory identifier or the commit hash. The guard in
-`benchmarks/llm_patch` enforces this mechanically.
+`benchmarks/patch_verification` enforces this mechanically.
 
 ```bash
 python -m benchmarks.patch_verification prepare --dataset data/corpus.jsonl \
     --json data/patch_prompts.jsonl
 python -m benchmarks.patch_verification collect \
     --manifest experiments/scratch/patch-verification/manifest.json \
-    --answers-dir experiments/scratch/llm-patch \
+    --answers-dir experiments/scratch/patch-verification \
     --json data/patch_responses.jsonl
 python -m benchmarks.patch_verification verify --dataset data/corpus.jsonl \
     --responses data/patch_responses.jsonl --json data/patch_verification.json

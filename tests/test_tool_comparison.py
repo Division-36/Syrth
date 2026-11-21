@@ -2,7 +2,7 @@
 
 The full scan takes minutes per repository, so these tests cover the parts
 that decide what a result means: the denominator, the co-location rule, and
-the resume logic. The scan itself is run through ``make cross-tool``.
+the resume logic. The scan itself is run through ``make tool-comparison``.
 """
 
 from __future__ import annotations

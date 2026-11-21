@@ -321,6 +321,11 @@ def _verify_whole_repository(
         notes.append("the cross-function certificate total does not match the rows")
     if data.get("examined") != len(rows):
         notes.append("the examined count does not match the number of rows")
+    repos = {row["repo"] for row in data.get("commits", [])}
+    if data.get("scanned_repositories") != sorted(repos):
+        notes.append(
+            "scanned_repositories does not match the repositories in the commit rows"
+        )
     if not full:
         if notes:
             return "MISMATCH", notes
@@ -390,6 +395,7 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "flow_removed",
         "flow_traded",
         "missing_pairs",
+        "scanned_repositories",
     ),
     "data/patch_verification.json": (
         "dataset",
@@ -463,10 +469,13 @@ def _verify_published_files(root: pathlib.Path) -> tuple[str, list[str]]:
             if not isinstance(value, str):
                 continue
             if value.endswith(".jsonl") or value.endswith(".json"):
+                # The corpus is an input, not a published artefact, and CI
+                # does not generate it; its absence is not a published-file
+                # problem. When the tree is the repository itself, anything
+                # else referenced must exist.
+                if value.replace("\\", "/").endswith(("corpus.jsonl", "records.jsonl")):
+                    continue
                 candidate = root / value.replace("\\", "/")
-                # When verifying against a copy of the tree, the corpus may
-                # legitimately be absent; against the repository itself it must
-                # be present, or a published file points at nothing.
                 if root == REPO_ROOT and not candidate.exists():
                     notes.append(f"{name}: records path {value} does not exist")
     if notes:

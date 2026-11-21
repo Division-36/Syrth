@@ -188,9 +188,10 @@ publishes.
 ### Changed
 
 - Commit metadata in the reviewed history is normalised to a neutral address
-  (`syrth@division-36.local`); the author's public address
-  (`ziad salah <zs.01117875692@gmail.com>`) appears on later commits, since the
-  study is published under the author's own name.
+  (`syrth@division-36.local`); later commits carry the author's public email
+  address since the study is published under the author's own name, and the
+  changelog records the name that is on those commits rather than the address
+  itself.
 - `README.md`, `docs/README.md`, `docs/limitations.md` and `docs/CONTRIBUTING.md`
   now quote the current measurements and the current CI matrix. Several of them
   had drifted to the pre-rewrite numbers.
