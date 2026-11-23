@@ -4,8 +4,8 @@
 registered before the first attempt. The analysis below follows it, with the
 deviations recorded in the registration document.
 
-This experiment asks the question the first paper leaves open: when a model
-proposes a fix, does certificate-based verification change the verdict? The
+This experiment asks: when a model proposes a fix, does certificate-based
+verification change the verdict? The
 model saw only the vulnerable source and the certificate — never the patched
 side of the corpus, the advisory identifier or the commit hash. The guard in
 `benchmarks/patch_verification` enforces this mechanically.
@@ -45,8 +45,9 @@ no new flow of any class appeared. The certificate, not the diff, decides.
 |---|---|---|---|
 | certificate-verified kill | 31/57 | 54.4% | [41.6%, 66.6%] |
 | guard-only: the fix parses but the flow still holds | 21/57 | 36.8% | [25.5%, 49.8%] |
-| the labelled flow was replaced by another one | 6/57 | 10.5% | — |
-| a new flow of any class appeared | 6/57 | 10.5% | [4.9%, 21.1%] |
+| the labelled flow persists | 4/57 | 7.0% | — |
+| the labelled flow was replaced by another one | 1/57 | 1.8% | — |
+| a new flow of the same class appeared (overlapping flag) | 6/57 | 10.5% | [4.9%, 21.1%] |
 
 All 57 returned files parse and preserve the labelled function.
 

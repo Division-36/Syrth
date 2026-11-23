@@ -12,6 +12,14 @@ each analysis decision contributes, and what happens to a certificate when a
 fix — human or machine — is applied. Every number carries its denominator, and
 every figure has a command that reproduces it.
 
+**Expanded corpus (v1.1).** The v1.1 corpus is the frozen v1 corpus plus an
+expansion — 369 pairs, 738 records, 43 repositories — and is the population for
+the paper's identity and survival studies. Its pre-registration, gate result,
+deviations and screening funnel are in
+[experiments/corpus-v1.1-frame.md](experiments/corpus-v1.1-frame.md), and its
+measurements are the `data/*-v1.1.json` files. The results below remain the frozen
+v1 figures, because the external instruments were run on v1 only.
+
 ## Why the metrics are unusual
 
 SYRTH is a risk-surface tool, not a classifier. It does not decide "vulnerable or
@@ -109,9 +117,14 @@ through `syrth.registry` so the corpus and the analyser agree on what a class
 means. That is a deliberate trade -- see [limitations.md](limitations.md) for why
 it makes the corpus narrower than the raw advisory count.
 
-## Current results
+## Frozen v1 results (the external-tool population)
 
-### `data/corpus.jsonl` -- the built corpus (current)
+These are the figures for `data/corpus.jsonl`, the only population on which
+Bandit, Semgrep and Ruff were run. The paper's identity and survival figures use
+the expanded v1.1 corpus instead; those are in `data/*-v1.1.json` and are
+described in [experiments/corpus-v1.1-frame.md](experiments/corpus-v1.1-frame.md).
+
+### `data/corpus.jsonl` -- the frozen v1 corpus
 
 350 records / 175 pairs / 24 repositories / 7 CWE classes, built by
 `tools/build_corpus.py`. The numbers below are a live run, not a remembered one;
@@ -570,8 +583,8 @@ by-tier splits.
 ## Certificate-verified patch verification
 
 What happens when a machine, rather than a developer, writes the fix? The
-second paper's first experiment asks that question on the 57 pairs whose
-labelled flow is confirmed. A model sees the vulnerable source and the
+patch-verification study asks that question on the 57 pairs whose labelled flow
+is confirmed. A model sees the vulnerable source and the
 certificate — never the real fix, the advisory, the commit or the repository
 name — and returns a corrected file. The certificate judges the answer; the
 diff never does. Full method, pre-registration and results are in
@@ -581,8 +594,8 @@ diff never does. Full method, pre-registration and results are in
 | --- | --- | --- |
 | certificate-verified kill | 31/57 | the source parses, the labelled flow is gone, and no new flow appeared |
 | guard-only | 21/57 | the source parses but the targeted flow still holds — the certificate refuses the patch |
-| flow replaced | 6/57 | the labelled flow was replaced by another one of the same class |
-| new flow | 6/57 | a new flow of some class appeared after the fix |
+| flow replaced | 1/57 | the labelled flow was replaced by another one of the same class |
+| new flow (overlapping flag) | 6/57 | a new flow of the same class appeared; all six also leave the original flow standing |
 
 All 57 answers parse. The 21 guard-only patches are the finding: a parse
 check or a passing test suite would accept them, and the certificate refuses

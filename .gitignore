@@ -74,6 +74,18 @@ data/*.json
 !data/patch_verification.json
 !data/patch_author_comparison.json
 !data/tool_capability.json
+
+# Expanded corpus (v1.1): the two harvest manifests, the merge manifest, the
+# validator output, and the measurements re-run on 738 records. The corpus
+# itself stays ignored and is rebuilt from its inputs.
+!data/corpus_manifest-v1.1.json
+!data/corpus_manifest-v1.1-cached.json
+!data/corpus_manifest-v1.1-pilot.json
+!data/corpus_validation-v1.1.json
+!data/identity_rename-v1.1.json
+!data/patch_study-v1.1.json
+!data/risk_benchmark-v1.1.json
+!data/ablation-v1.1.json
 # Whole-repository tool comparison in compact form: every count the docs quote.
 # The raw per-finding lists stay in experiments/scratch and are reproducible
 # with `make tool-comparison`.

@@ -108,11 +108,15 @@ meant to remove still holds.
 
 ## What is measured, in one table
 
+The numbers here are the frozen v1 figures. The expanded v1.1 figures are in
+`data/*-v1.1.json` and are the population used by the paper's identity and
+survival studies.
+
 | Question | Number | Where the detail is |
 |---|---|---|
-| Does it name the class whose sink the source proves is present? | 111/116 (95.7%) | [benchmark.md#current-results](benchmark.md#current-results) |
+| Does it name the class whose sink the source proves is present? | 111/116 (95.7%) | [benchmark.md#frozen-v1-results-the-external-tool-population](benchmark.md#frozen-v1-results-the-external-tool-population) |
 | Does it look at the same dangerous call? | 199/217 (91.7%) | [benchmark.md#competitor-comparison](benchmark.md#competitor-comparison) |
-| Is repeat output identical, and stable under renaming? | 350/350, 350/350 | [benchmark.md#current-results](benchmark.md#current-results) |
+| Is repeat output identical, and stable under renaming? | 350/350, 350/350 | [benchmark.md#frozen-v1-results-the-external-tool-population](benchmark.md#frozen-v1-results-the-external-tool-population) |
 | Does its own mitigation remove a confirmed flow? | 89/100 | [benchmark.md#the-kill-rate-question-adjudicated](benchmark.md#the-kill-rate-question-adjudicated) |
 | What happens to the certificate under a real fix? | 46/54 persist, 7 removed, 1 traded | [benchmark.md#real-commit-patch-study](benchmark.md#real-commit-patch-study) |
 | What happens at repository scale? | 57 traced: 50 persist, 6 removed, 1 traded | [benchmark.md#whole-repository-patch-study](benchmark.md#whole-repository-patch-study) |
@@ -142,14 +146,15 @@ omission.
 
 ## Status
 
-680 tests; how many pass depends on the environment: the export test skips
+685 tests; how many pass depends on the environment: the export test skips
 without a C compiler (`gcc` on Linux runs it instead), and the measurement-table
 and freeze tests skip without `data/corpus.jsonl`, which CI does not generate.
 `ruff check syrth tests benchmarks tools` is clean. CI runs the suite on Ubuntu,
 Windows and macOS at Python 3.10 and 3.12.
 
-Current measured figures, reproduced by
-`python -m benchmarks.risk_metrics` on `data/corpus.jsonl`:
+Frozen v1 measured figures, reproduced by
+`python -m benchmarks.risk_metrics --dataset data/corpus.jsonl` (the only
+population the external instruments were run on):
 
 | metric | value |
 |---|---|

@@ -2,7 +2,7 @@
   "competitors_source": "data/competitor_benchmark.json",
   "trees_source": "data/tool_comparison.json",
   "populations": {
-    "snippet_records": 116,
+    "expected_classes": 116,
     "whole_repositories": 24
   },
   "matched_layers": {

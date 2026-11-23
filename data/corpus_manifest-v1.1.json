@@ -1,0 +1,53 @@
+{
+  "inputs": [
+    {
+      "path": "data/corpus.jsonl",
+      "sha256": "febac76e0e9da2e1a6b7a409a6b23f31189c4f33bc8ed5c136d09d2a20a0139b",
+      "records": 350,
+      "pairs": 175,
+      "added_pairs": 172
+    },
+    {
+      "path": "data/corpus-v1.1-cached.jsonl",
+      "sha256": "ed6337af28adc86e4f36632fa917ae81a5e3e33bda64485751f4cae176920d60",
+      "records": 610,
+      "pairs": 305,
+      "added_pairs": 187
+    },
+    {
+      "path": "data/corpus-v1.1-pilot.jsonl",
+      "sha256": "0353f8bdda29e0581d763499cbcbfe9d4feeef05796a17d3e7628a8cbba4f520",
+      "records": 480,
+      "pairs": 240,
+      "added_pairs": 10
+    }
+  ],
+  "rule": "group on pair_id; provenance then function-body dedup; earlier input wins; incomplete pairs rejected",
+  "records": 738,
+  "pairs": 369,
+  "groups": 155,
+  "repos": 43,
+  "classes": {
+    "CWE-22": 193,
+    "CWE-327": 1,
+    "CWE-502": 15,
+    "CWE-601": 14,
+    "CWE-611": 1,
+    "CWE-79": 74,
+    "CWE-89": 41,
+    "CWE-918": 12,
+    "CWE-94": 18
+  },
+  "evidence_tiers": {
+    "direct-sink": 184,
+    "module-proximity": 185
+  },
+  "duplicate_records": 0,
+  "missing_pair_id": 0,
+  "incomplete_pairs": 0,
+  "incomplete_examples": [],
+  "label_mismatch": 0,
+  "pair_id_mismatch": 0,
+  "duplicate_provenance_pairs": 348,
+  "duplicate_content_pairs": 3
+}

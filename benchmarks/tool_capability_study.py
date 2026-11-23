@@ -139,7 +139,7 @@ def build(competitors: dict[str, Any], trees: dict[str, Any]) -> dict[str, Any]:
         "competitors_source": "data/competitor_benchmark.json",
         "trees_source": "data/tool_comparison.json",
         "populations": {
-            "snippet_records": instruments["syrth"]["snippet"]["class_coverage"]["of"],
+            "expected_classes": instruments["syrth"]["snippet"]["class_coverage"]["of"],
             "whole_repositories": instruments["syrth"]["tree"]["advisory_function"]["of"],
         },
         "matched_layers": {
@@ -159,7 +159,7 @@ def build(competitors: dict[str, Any], trees: dict[str, Any]) -> dict[str, Any]:
 def _render(result: dict[str, Any]) -> str:
     lines = [
         "Matched capability comparison",
-        f"  snippets: {result['populations']['snippet_records']} records",
+        f"  snippets: {result['populations']['expected_classes']} expected classes",
         f"  trees   : {result['populations']['whole_repositories']} repositories",
         "",
         f"{'instrument':38s} {'class':>10s} {'sink':>10s} {'fix':>8s} {'file':>8s} {'function':>10s}",

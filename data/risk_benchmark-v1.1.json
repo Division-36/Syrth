@@ -1,0 +1,67 @@
+{
+  "records": 738,
+  "tier_coverage": {
+    "direct-sink": {
+      "expected": 286,
+      "covered": 278,
+      "records": 368
+    },
+    "module-proximity": {
+      "expected": 80,
+      "covered": 77,
+      "records": 370
+    }
+  },
+  "category_coverage": 0.9699453551912568,
+  "rank_discordance": 0.0,
+  "rename_invariance": 0.997289972899729,
+  "kill_rate": 0.8932806324110671,
+  "determinism": 1.0,
+  "by_cwe": {
+    "CWE-22": {
+      "expected": 165,
+      "covered": 158
+    },
+    "CWE-502": {
+      "expected": 29,
+      "covered": 29
+    },
+    "CWE-601": {
+      "expected": 85,
+      "covered": 85
+    },
+    "CWE-79": {
+      "expected": 34,
+      "covered": 32
+    },
+    "CWE-89": {
+      "expected": 8,
+      "covered": 8
+    },
+    "CWE-611": {
+      "expected": 5,
+      "covered": 3
+    },
+    "CWE-918": {
+      "expected": 12,
+      "covered": 12
+    },
+    "CWE-94": {
+      "expected": 28,
+      "covered": 28
+    }
+  },
+  "support": {
+    "records": 738,
+    "records_with_expected": 306,
+    "expected_classes": 366,
+    "covered_classes": 355,
+    "rank_pairs": 64,
+    "rename_checked": 738,
+    "patch_attempts": 253
+  },
+  "warnings": [
+    "0.3% of reports changed under renaming, which breaks the invariance guarantee",
+    "3.0% of the vulnerability classes present in the source were not named"
+  ]
+}

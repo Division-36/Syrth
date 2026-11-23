@@ -38,7 +38,7 @@ Do not claim a command passed unless you ran it and read the output.
 | `syrth/scan.py` | scanner and CLI |
 | `syrth/patch.py` | patch backends and verification |
 | `benchmarks/` | the harness |
-| `tests/` | 680 tests |
+| `tests/` | 685 tests |
 
 ## House rules
 
@@ -69,7 +69,7 @@ a test asserting a flow is reported *and* that a safe argument shape is not.
 a component of a value (`parsed.netloc`), do **not** add it — see
 [`docs/limitations.md`](limitations.md).
 
-**A feature:** add to `features/extractor.py` and bump `FEATURE_SCHEMA_VERSION`.
+**A feature:** add to `syrth/features/extractor.py` and bump `FEATURE_SCHEMA_VERSION`.
 Old model bundles will then be refused rather than silently misread.
 
 **A serialisation field:** bump the relevant schema version.

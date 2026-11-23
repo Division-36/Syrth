@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
+import io
 import json
 import os
 import re
@@ -45,6 +47,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -82,8 +85,6 @@ USER_AGENT = "syrth-corpus/1.0 (+https://github.com/Division-36/Syrth)"
 #: invariant 3: short ambiguous names are sinks only when bound from a dangerous
 #: module. Deriving from it makes the corpus and the product agree on what a
 #: class *means*, which is the only way a corpus can measure the product.
-CWE_TO_CATEGORY = CWE_TO_CATEGORY
-
 #: Classes with at least one modelled sink, for cheap membership checks.
 IN_SCOPE: frozenset[str] = frozenset(CWE_TO_CATEGORY)
 
@@ -547,6 +548,13 @@ class BuildStats:
     evidence_tiers: dict = field(default_factory=dict)
     classes_covered: list[str] = field(default_factory=list)
     repos_covered: dict[str, int] = field(default_factory=dict)
+    frame: str = "ghsa+osv"
+    osv_dump: str = ""
+    osv_dump_sha256: str = ""
+    repos_in_frame: int = 0
+    repos_after_rule: int = 0
+    repos_selected: list[str] = field(default_factory=list)
+    repos_selected_sizes: dict[str, int] = field(default_factory=dict)
     rate: dict = field(default_factory=dict)
     errors: list[dict] = field(default_factory=list)
     skipped: dict[str, str] = field(default_factory=dict)
@@ -845,6 +853,143 @@ def _package_and_repo(item: dict, references: list[str]) -> tuple[str, str]:
                     package = repo.rsplit("/", 1)[-1]
                 break
     return package, repo
+
+
+def _github_slug(url: str) -> str:
+    """Return ``owner/name`` for a GitHub URL or a bare ``owner/name`` hint."""
+    if not url:
+        return ""
+    match = re.search(r"github\.com/([^/\s]+/[^/\s#?]+)", url)
+    if match:
+        return match.group(1).lower().removesuffix(".git")
+    if re.fullmatch(r"[\w.-]+/[\w.-]+", url):
+        return url.lower().removesuffix(".git")
+    return ""
+
+
+def load_osv_dump(path: Path) -> tuple[list[Advisory], dict]:
+    """Advisories from a local OSV PyPI dump, as a self-contained frame.
+
+    The network frame asks GHSA about a hand-written package list, which caps
+    the corpus at whatever that list happens to name. The OSV dump is the whole
+    PyPI ecosystem: every advisory OSV publishes, with references. Selecting on
+    "in-scope CWE and a GitHub commit reference" makes the frame a property of
+    the data rather than of the list.
+
+    Only advisories that carry at least one fix commit are returned: a record
+    without a commit cannot be labelled. ``repo_hint`` is the repository that
+    owns the first commit reference, so cloning and attribution need no package
+    table either.
+
+    The returned metadata records the dump's sha256 and the stage counts, so a
+    published corpus can name the exact frame it was drawn from.
+    """
+    raw = Path(path).read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    advisories: list[Advisory] = []
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        names = sorted(n for n in archive.namelist() if n.endswith(".json"))
+        entries = len(names)
+        for name in names:
+            try:
+                item = json.loads(archive.read(name))
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
+
+            cwes: set[str] = set()
+            for bucket in [item.get("database_specific") or {}] + [
+                affected.get("database_specific") or {}
+                for affected in item.get("affected") or []
+            ]:
+                cwes.update(str(c) for c in (bucket.get("cwe_ids") or []))
+            if not (cwes & IN_SCOPE):
+                continue
+
+            references = [
+                r.get("url", "") for r in (item.get("references") or [])
+                if isinstance(r, dict)
+            ]
+            commits = tuple(dict.fromkeys(
+                _commit_from_url(url) for url in references
+                if _commit_from_url(url)
+            ))
+            if not commits:
+                continue
+
+            repo = ""
+            for url in references:
+                if "/commit/" in url:
+                    repo = _github_slug(url)
+                    if repo:
+                        break
+            if not repo:
+                for url in references:
+                    repo = _github_slug(url)
+                    if repo:
+                        break
+            if not repo:
+                continue
+
+            package = ""
+            for affected in item.get("affected") or []:
+                candidate = affected.get("package") or {}
+                if (candidate.get("ecosystem") or "").lower() == "pypi":
+                    package = candidate.get("name") or ""
+                    if package:
+                        break
+
+            advisories.append(Advisory(
+                advisory_id=item.get("id") or name.removesuffix(".json"),
+                source="osv-dump",
+                cwes=tuple(sorted(cwes)),
+                summary=(item.get("summary") or "")[:300],
+                repo_hint=f"https://github.com/{repo}",
+                fix_commits=commits,
+                package=package,
+            ))
+
+    by_id: dict[str, Advisory] = {}
+    for advisory in advisories:
+        by_id.setdefault(advisory.advisory_id, advisory)
+    ordered = [by_id[key] for key in sorted(by_id)]
+    in_scope = [a for a in ordered if a.in_scope()]
+    meta = {
+        "sha256": digest,
+        "entries": entries,
+        "with_commits": len(ordered),
+        "in_scope": len(in_scope),
+        "repos": len({_github_slug(a.repo_hint) for a in in_scope}),
+    }
+    return in_scope, meta
+
+
+def extend_repos_from_advisories(
+    repos: list[tuple[str, str]], advisories: list[Advisory]
+) -> list[tuple[str, str]]:
+    """Append repositories named by advisory commit references.
+
+    Clone names are the repository's last path segment, which is what
+    ``_candidate_repos`` compares against the advisory hint. Two owners with the
+    same repository name are kept apart as ``owner__name`` rather than merged;
+    a collision is rare and silently cloning the wrong project would be worse.
+    """
+    known = {_github_slug(url): name for name, url in repos}
+    names = {name.lower() for name, _url in repos}
+    added: list[tuple[str, str]] = []
+    for advisory in advisories:
+        slug = _github_slug(advisory.repo_hint)
+        if not slug or slug in known:
+            continue
+        name = slug.rsplit("/", 1)[-1]
+        if name.lower() in names:
+            name = slug.replace("/", "__")
+        if name.lower() in names:
+            continue
+        repos.append((name, f"https://github.com/{slug}.git"))
+        known[slug] = name
+        names.add(name.lower())
+        added.append((name, slug))
+    return added
 
 
 # --------------------------------------------------------------------------
@@ -1518,22 +1663,37 @@ def build(args: argparse.Namespace) -> tuple[list[Record], BuildStats]:
     # on this corpus django alone is 400 MB; with the wider package list that is
     # hours of cloning spent on empty directories. Repositories are now cloned
     # lazily, once an advisory has been attributed to one.
-    distributions = [
-        args.distributions.get(name, name) for name, _url in args.repos
-    ]
-    print(f"[1/5] fetching advisories from GHSA per package "
-          f"({len(distributions)} packages x {args.ghsa_pages_per_package} pages, "
-          f"budget {budget.limit}/h)", flush=True)
-    advisories, ghsa_count = collect_advisories(
-        fetcher, distributions, args.packages, args.ghsa_pages_per_package,
-        args.ghsa_pages, args.ecosystem,
-        Path(args.advisory_cache) if args.advisory_cache else None,
-        args.refresh_advisories, args.workers,
-    )
-
+    if args.osv_dump:
+        advisories, dump_meta = load_osv_dump(Path(args.osv_dump))
+        stats.frame = "osv-dump"
+        stats.osv_dump = args.osv_dump
+        stats.osv_dump_sha256 = dump_meta["sha256"]
+        added = extend_repos_from_advisories(args.repos, advisories)
+        print(f"[1/5] loading OSV dump {args.osv_dump}", flush=True)
+        print(f"      {dump_meta['entries']} entries | "
+              f"{dump_meta['with_commits']} with commit references | "
+              f"{dump_meta['in_scope']} in scope across "
+              f"{dump_meta['repos']} repositories", flush=True)
+        print(f"      {len(added)} repositories added from advisory references",
+              flush=True)
+        ghsa_count = 0
+        stats.advisories_seen = dump_meta["entries"]
+    else:
+        distributions = [
+            args.distributions.get(name, name) for name, _url in args.repos
+        ]
+        print(f"[1/5] fetching advisories from GHSA per package "
+              f"({len(distributions)} packages x {args.ghsa_pages_per_package} pages, "
+              f"budget {budget.limit}/h)", flush=True)
+        advisories, ghsa_count = collect_advisories(
+            fetcher, distributions, args.packages, args.ghsa_pages_per_package,
+            args.ghsa_pages, args.ecosystem,
+            Path(args.advisory_cache) if args.advisory_cache else None,
+            args.refresh_advisories, args.workers,
+        )
+        stats.advisories_seen = len(advisories)
 
     # Merging already happened inside collect_advisories.
-    stats.advisories_seen = len(advisories)
     advisories = [a for a in advisories if a.in_scope()]
     stats.advisories_in_scope = len(advisories)
     print(f"      {len(advisories)} advisories in scope "
@@ -1555,9 +1715,13 @@ def build(args: argparse.Namespace) -> tuple[list[Record], BuildStats]:
     print("[3/5] selecting repositories by advisory density", flush=True)
     candidates = _candidate_repos(unique, args.repos)
     urls = dict(args.repos)
-    sizes = repo_sizes(fetcher, candidates, args.repos)
     hits: dict[str, int] = {}
+    slugs = {_github_slug(url): name for name, url in args.repos}
     for advisory in unique:
+        slug = _github_slug(advisory.repo_hint)
+        if slug and slug in slugs:
+            hits[slugs[slug]] = hits.get(slugs[slug], 0) + 1
+            continue
         hint = advisory.repo_hint.rsplit("/", 1)[-1].lower().removesuffix(".git")
         package = advisory.package.lower()
         for name in candidates:
@@ -1565,10 +1729,41 @@ def build(args: argparse.Namespace) -> tuple[list[Record], BuildStats]:
             if hint == low or package in (low, low.replace("-", "_")):
                 hits[name] = hits.get(name, 0) + 1
                 break
-    wanted, skipped = select_repos_by_density(
-        candidates, hits, sizes, args.max_repos, args.max_repo_mb
-    )
-    stats.skipped.update(skipped)
+    stats.repos_in_frame = len(candidates)
+    if args.min_advisories_per_repo > 1:
+        floor = args.min_advisories_per_repo
+        before = len(candidates)
+        candidates = [name for name in candidates
+                      if hits.get(name, 0) >= floor]
+        stats.skipped[f"frame:min-advisories-{floor}"] = (
+            f"{before - len(candidates)} repositories below {floor} advisories")
+    stats.repos_after_rule = len(candidates)
+    sizes: dict[str, int] = {}
+    if args.only_cached:
+        # Low-bandwidth / resume mode: extract from clones that already exist
+        # instead of paying for a fresh clone. Selection is by advisory count,
+        # because clone size is irrelevant when nothing is downloaded.
+        available = [
+            name for name in candidates
+            if (cache.root / name / ".git").is_dir()
+        ]
+        wanted = available[: args.max_repos] if args.max_repos else available
+        stats.repos_selected = list(wanted)
+        stats.skipped["frame:only-cached"] = (
+            f"{len(candidates) - len(available)} repositories not cached")
+    else:
+        sizes = repo_sizes(
+            fetcher, candidates, args.repos,
+            Path(args.repo_size_cache) if args.repo_size_cache else None,
+        )
+        wanted, skipped = select_repos_by_density(
+            candidates, hits, sizes, args.max_repos, args.max_repo_mb
+        )
+        stats.repos_selected = list(wanted)
+        stats.repos_selected_sizes = {
+            name: sizes[name] for name in wanted if name in sizes
+        }
+        stats.skipped.update(skipped)
     over = [f"{n}({sizes.get(n)}MB)" for n in candidates
             if sizes.get(n) is not None and sizes[n] > args.max_repo_mb]
     print(f"      {len(candidates)} candidates, sizes known for {len(sizes)}", flush=True)
@@ -1617,7 +1812,7 @@ def build(args: argparse.Namespace) -> tuple[list[Record], BuildStats]:
     content_keys: set[tuple] = set()
     classes: set[str] = set()
 
-    by_repo = _group_by_repo(unique, cache.root)
+    by_repo = _group_by_repo(unique, cache.root, set(wanted))
     for repo_name, items in sorted(by_repo.items()):
         repo_path = cache.root / repo_name
         if not (repo_path / ".git").is_dir():
@@ -1625,12 +1820,18 @@ def build(args: argparse.Namespace) -> tuple[list[Record], BuildStats]:
             continue
         print(f"      {repo_name}: {len(items)} advisories", flush=True)
         repo_started = time.monotonic()
+        budget_hit = False
         for advisory in items[: args.max_advisories_per_repo]:
             # Fix commits are listed newest-first and the first one that lands is
             # almost always the fix itself. Continuing into the remaining commits
             # multiplies blob fetches to re-derive a vulnerability already
             # captured, so an advisory stops once it has produced a record.
-            for commit in advisory.fix_commits[: args.max_commits_per_advisory]:
+            commits = (
+                advisory.fix_commits
+                if args.max_commits_per_advisory <= 0
+                else advisory.fix_commits[: args.max_commits_per_advisory]
+            )
+            for commit in commits:
                 found_here = 0
                 stats.commits_inspected += 1
                 try:
@@ -1757,7 +1958,10 @@ def build(args: argparse.Namespace) -> tuple[list[Record], BuildStats]:
                     )
                     print(f"      {repo_name}: time budget reached, moving on",
                           flush=True)
+                    budget_hit = True
                     break
+            if budget_hit:
+                break
 
     stats.classes_covered = sorted(classes)
     stats.rate = budget.snapshot()
@@ -1778,8 +1982,13 @@ def _candidate_repos(
     with commit presence once the clone exists.
     """
     names = {name.lower(): name for name, _url in repos}
+    slugs = {_github_slug(url): name for name, url in repos}
     hits: dict[str, int] = {}
     for advisory in advisories:
+        slug = _github_slug(advisory.repo_hint)
+        if slug and slug in slugs:
+            hits[slugs[slug]] = hits.get(slugs[slug], 0) + 1
+            continue
         hint = advisory.repo_hint.rsplit("/", 1)[-1].lower().removesuffix(".git")
         package = advisory.package.lower().replace("_", "-")
         for candidate in (hint, package, advisory.package.lower()):
@@ -1795,7 +2004,10 @@ def _candidate_repos(
 
 
 def repo_sizes(
-    fetcher: Fetcher, names: list[str], repo_entries: list[tuple[str, str]]
+    fetcher: Fetcher,
+    names: list[str],
+    repo_entries: list[tuple[str, str]],
+    cache_path: Path | None = None,
 ) -> dict[str, int]:
     """Clone size in MB per repository, from the GitHub API.
 
@@ -1804,17 +2016,42 @@ def repo_sizes(
     repository behind them, and both would have been skipped by a size cap. The
     API reports ``size`` in KB for one request each, which is far cheaper than
     discovering it by cloning.
+
+    Sizes are cached by ``owner/name``. One request per repository is cheap in
+    principle, but GitHub answers each in seconds from some networks, and the
+    cache also freezes the density ordering: a repository that grows between
+    runs cannot silently reorder a frame that was already registered.
     """
     out: dict[str, int] = {}
+    cached: dict[str, int] = {}
+    if cache_path and cache_path.exists():
+        try:
+            stored = json.loads(cache_path.read_text(encoding="utf-8"))
+            cached = {
+                str(key): int(value)
+                for key, value in (stored.get("sizes") or {}).items()
+            }
+        except (json.JSONDecodeError, TypeError, ValueError):
+            cached = {}
     urls = dict(repo_entries)
     for name in names:
         url = urls.get(name, "")
         slug = url.rsplit("github.com/", 1)[-1].removesuffix(".git") if url else ""
         if not re.fullmatch(r"[\w.-]+/[\w.-]+", slug):
             continue
+        if slug in cached:
+            out[name] = cached[slug]
+            continue
         payload = fetcher.get(f"{GITHUB_API}/repos/{slug}", budgeted=False)
         if isinstance(payload, dict) and isinstance(payload.get("size"), int):
             out[name] = payload["size"] // 1024
+            cached[slug] = out[name]
+    if cache_path:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(
+            json.dumps({"sizes": dict(sorted(cached.items()))}, indent=1),
+            encoding="utf-8",
+        )
     return out
 
 
@@ -1849,7 +2086,11 @@ def select_repos_by_density(
     return chosen, skipped
 
 
-def _group_by_repo(advisories: list[Advisory], cache_root: Path) -> dict[str, list[Advisory]]:
+def _group_by_repo(
+    advisories: list[Advisory],
+    cache_root: Path,
+    only: set[str] | None = None,
+) -> dict[str, list[Advisory]]:
     """Attach each advisory to a locally cloned repository.
 
     Matching is done on three signals, in order of reliability:
@@ -1863,10 +2104,18 @@ def _group_by_repo(advisories: list[Advisory], cache_root: Path) -> dict[str, li
     Signal 1 is what makes this reliable. GHSA reports the repository that
     *published* the advisory, which is frequently not the repository the fix
     landed in, and name-based matching alone discarded most advisories.
+
+    ``only`` restricts the scan to repositories the frame selected. Without it,
+    every clone left in the cache — including ones a later run declined to
+    select — silently joins the corpus, so the output depends on the machine's
+    history rather than on the declared frame.
     """
     grouped: dict[str, list[Advisory]] = {}
     clones = [p for p in (cache_root.iterdir() if cache_root.exists() else [])
               if (p / ".git").is_dir()]
+    clones.sort(key=lambda path: path.name)
+    if only is not None:
+        clones = [p for p in clones if p.name in only]
     if not clones:
         return grouped
 
@@ -1882,7 +2131,7 @@ def _group_by_repo(advisories: list[Advisory], cache_root: Path) -> dict[str, li
 
     for advisory in advisories:
         for repo_path in clones:
-            if present_by_clone[repo_path.name] & set(advisory.fix_commits[:3]):
+            if present_by_clone[repo_path.name] & set(advisory.fix_commits):
                 grouped.setdefault(repo_path.name, []).append(advisory)
                 break
         else:
@@ -1899,7 +2148,7 @@ def _all_commits(advisories: list[Advisory]) -> list[str]:
     """Every candidate commit across advisories, deduplicated, order kept."""
     seen: dict[str, None] = {}
     for advisory in advisories:
-        for commit in advisory.fix_commits[:3]:
+        for commit in advisory.fix_commits:
             seen.setdefault(commit, None)
     return list(seen)
 
@@ -1985,12 +2234,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", default="data/corpus.jsonl")
     parser.add_argument("--manifest", default="data/corpus_manifest.json")
     parser.add_argument("--cache", default="experiments/scratch/repos")
+    parser.add_argument("--repo-size-cache",
+                        default="experiments/scratch/repo-sizes.json",
+                        help="cached GitHub clone sizes in MB, keyed by owner/name")
     parser.add_argument("--ghsa-pages", type=int, default=12,
                         help="GHSA pages of 100 (budget permitting)")
     parser.add_argument("--ecosystem", default="PyPI")
     parser.add_argument("--max-files", type=int, default=12)
     parser.add_argument("--max-functions", type=int, default=6)
-    parser.add_argument("--max-commits-per-advisory", type=int, default=1)
+    parser.add_argument("--max-commits-per-advisory", type=int, default=0,
+                        help="fix commits to inspect per advisory; 0 = all. "
+                             "The list is newest-first, so a follow-up commit "
+                             "can sit ahead of the commit that introduced the "
+                             "vulnerable function")
     parser.add_argument("--max-advisories-per-repo", type=int, default=400,
                         help="cap per repo so one large history cannot starve "
                              "the others or overrun the run")
@@ -2004,6 +2260,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repos", nargs="*", default=[
         f"{name}={url}" for name, url, _ in DEFAULT_REPOS
     ])
+    parser.add_argument("--osv-dump", default="",
+                        help="local OSV PyPI all.zip used as the advisory frame; "
+                             "bypasses GHSA/OSV collection and derives repositories "
+                             "from advisory commit references")
+    parser.add_argument("--min-advisories-per-repo", type=int, default=1,
+                        help="frame rule: keep only repositories with at least "
+                             "this many in-scope advisories")
     parser.add_argument("--ghsa-pages-per-package", type=int, default=7,
                         help="pages of 100 per affected package. The per-package "
                              "query is the primary GHSA path; --ghsa-pages only "
@@ -2014,6 +2277,9 @@ def build_parser() -> argparse.ArgumentParser:
                              "waiting on a clone that never finishes.")
     parser.add_argument("--max-repos", type=int, default=40,
                         help="cap on cloned repositories, densest per MB first")
+    parser.add_argument("--only-cached", action="store_true",
+                        help="extract only from repositories already under "
+                             "--cache; skip size lookup, selection and cloning")
     parser.add_argument("--checkpoint", default="on",
                         help="'on' writes each accepted record to --out as it is "
                              "produced, so a killed run still yields what it "

@@ -1,0 +1,30 @@
+{
+  "dataset": "data/corpus-v1.1.jsonl",
+  "seed": 42,
+  "scopes": {
+    "parameters": {
+      "checked": 611,
+      "classes_stable": 611,
+      "identities_stable": 572,
+      "origins_stable": 592,
+      "confirmed_before": 547,
+      "confirmed_after": 520
+    },
+    "functions": {
+      "checked": 703,
+      "classes_stable": 703,
+      "identities_stable": 406,
+      "origins_stable": 703,
+      "confirmed_before": 601,
+      "confirmed_after": 601
+    },
+    "all": {
+      "checked": 738,
+      "classes_stable": 736,
+      "identities_stable": 428,
+      "origins_stable": 629,
+      "confirmed_before": 626,
+      "confirmed_after": 597
+    }
+  }
+}

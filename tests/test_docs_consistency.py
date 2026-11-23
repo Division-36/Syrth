@@ -201,6 +201,25 @@ class TestPublishedMeasurementsMatchTheDocs:
         )
         assert report["kill_rate"] == pytest.approx(89 / 100, abs=0.001)
 
+    def test_expanded_risk_benchmark_matches_the_paper(self):
+        # The paper quotes these three figures for the 738-record corpus. They
+        # are read from the published file, not recomputed, so a stale file is
+        # caught before a reader quotes a number the harness no longer produces.
+        report = self._load("risk_benchmark-v1.1.json")
+        assert report["records"] == 738
+        assert report["category_coverage"] == pytest.approx(355 / 366, abs=0.001)
+        assert report["kill_rate"] == pytest.approx(226 / 253, abs=0.001)
+
+    def test_expanded_manifest_matches_the_paper(self):
+        manifest = self._load("corpus_manifest-v1.1.json")
+        assert manifest["records"] == 738
+        assert manifest["pairs"] == 369
+        assert manifest["repos"] == 43
+        validation = self._load("corpus_validation-v1.1.json")
+        assert validation["sha256"] == (
+            "dcf9df988c1f6200990e088938e46ccd0b27666c237912cd167777f3992c3db6"
+        )
+
     def test_competitor_benchmark_covers_the_whole_corpus(self):
         report = self._load("competitor_benchmark.json")
         assert report["records"] == 350

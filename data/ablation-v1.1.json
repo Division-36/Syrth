@@ -1,0 +1,241 @@
+{
+  "dataset": "data/corpus-v1.1.jsonl",
+  "rows": {
+    "full": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        64,
+        64
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        226,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 19.142
+    },
+    "no-schemas": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        72,
+        72
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        217,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 12.358
+    },
+    "untyped-kills": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        64,
+        64
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        226,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 11.912
+    },
+    "no-inline-guards": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        64,
+        64
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        226,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 11.919
+    },
+    "no-containment": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        64,
+        64
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        226,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 11.719
+    },
+    "no-guards": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        64,
+        64
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        226,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 11.824
+    },
+    "name-sources": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        179,
+        534
+      ],
+      "rank": [
+        58,
+        58
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        106,
+        126
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 10.999
+    },
+    "no-interproc": {
+      "records": 738,
+      "coverage": [
+        355,
+        366
+      ],
+      "coverage_rate": 0.9699,
+      "spurious": [
+        177,
+        532
+      ],
+      "rank": [
+        64,
+        64
+      ],
+      "rename": [
+        736,
+        738
+      ],
+      "kill": [
+        226,
+        253
+      ],
+      "determinism": [
+        738,
+        738
+      ],
+      "seconds": 11.146
+    },
+    "interprocedural": {
+      "cross_function_on": 358,
+      "cross_function_off": 0
+    }
+  }
+}

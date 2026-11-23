@@ -16,6 +16,9 @@ The rules it follows:
 *   The whole-repository replay takes hours and needs the repositories, so by
     default its published file is verified against the corpus and against its
     own internal invariants. ``--full`` re-scans.
+*   The expanded-corpus (v1.1) checks are bound to ``data/corpus-v1.1.jsonl`` and
+    skip when that corpus has not been rebuilt. ``--dataset`` selects the
+    frozen v1 corpus only; it never redirects a v1.1 check.
 
 Usage::
 
@@ -69,17 +72,20 @@ class Check:
         module: str,
         args: Sequence[str],
         *,
-        needs_corpus: bool = True,
         compare: str = "all",
+        dataset: str | None = None,
     ) -> None:
         self.name = name
         self.published = published
         self.module = module
         self.args = tuple(args)
-        self.needs_corpus = needs_corpus
         #: ``all`` compares the whole document; ``syrth-only`` compares the
         #: parts that do not depend on an external tool's version.
         self.compare = compare
+        #: A fixed corpus for a check that is not run on ``--dataset``. The
+        #: expanded-corpus checks use this so they cannot silently run against
+        #: the frozen v1 corpus when the caller passes a different file.
+        self.dataset = dataset
 
 
 CHECKS: tuple[Check, ...] = (
@@ -130,6 +136,51 @@ CHECKS: tuple[Check, ...] = (
     # here: it rescans all 24 worktrees, taking ~25 minutes. Its published
     # file is instead checked in `_verify_published_files` (keys, fields and
     # invariants), and a full re-scan is `make tool-comparison`.
+)
+
+#: The expanded-corpus measurements. They are bound to
+#: ``data/corpus-v1.1.jsonl`` rather than to ``--dataset`` so that a caller
+#: verifying the frozen v1 corpus cannot accidentally compare v1 numbers with
+#: a v1.1 file (or the reverse). The corpus is an input, not a published
+#: artefact, so these checks skip when it has not been rebuilt.
+EXPANDED_DATASET = "data/corpus-v1.1.jsonl"
+
+EXPANDED_CHECKS: tuple[Check, ...] = (
+    Check(
+        "expanded contract metrics",
+        "data/risk_benchmark-v1.1.json",
+        "benchmarks.risk_metrics",
+        ("--dataset", "{dataset}"),
+        dataset=EXPANDED_DATASET,
+    ),
+    Check(
+        "expanded certificate identity",
+        "data/identity_rename-v1.1.json",
+        "benchmarks.identity",
+        ("--dataset", "{dataset}"),
+        dataset=EXPANDED_DATASET,
+    ),
+    Check(
+        "expanded component ablation",
+        "data/ablation-v1.1.json",
+        "benchmarks.ablation",
+        ("--dataset", "{dataset}"),
+        dataset=EXPANDED_DATASET,
+    ),
+    Check(
+        "expanded real-commit patch study",
+        "data/patch_study-v1.1.json",
+        "benchmarks.patch_study",
+        ("--dataset", "{dataset}"),
+        dataset=EXPANDED_DATASET,
+    ),
+    Check(
+        "expanded corpus validation",
+        "data/corpus_validation-v1.1.json",
+        "tools.validate_corpus",
+        ("--dataset", "{dataset}"),
+        dataset=EXPANDED_DATASET,
+    ),
 )
 
 
@@ -246,6 +297,16 @@ def _run_check(
     if not published_path.exists():
         return "SKIP", [f"{check.published} is not published"]
     published = _load(published_path)
+    if check.dataset:
+        candidate = pathlib.Path(check.dataset)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        if not candidate.exists():
+            return "SKIP", [
+                f"{check.dataset} is not present, so the expanded-corpus "
+                "check cannot run"
+            ]
+    dataset_arg = check.dataset or dataset
     with tempfile.TemporaryDirectory() as directory:
         output = pathlib.Path(directory) / "result.json"
         command = [
@@ -254,12 +315,12 @@ def _run_check(
             check.module,
             "--json",
             str(output),
-            *[arg.format(dataset=str(dataset)) for arg in check.args],
+            *[arg.format(dataset=str(dataset_arg)) for arg in check.args],
         ]
         try:
             completed = subprocess.run(
                 command,
-                cwd=REPO_ROOT,
+                cwd=root,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -436,6 +497,89 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "warnings",
         "zero_denominators",
     ),
+    "data/corpus_manifest-v1.1.json": (
+        "inputs",
+        "rule",
+        "records",
+        "pairs",
+        "groups",
+        "repos",
+        "classes",
+        "evidence_tiers",
+        "incomplete_pairs",
+        "duplicate_content_pairs",
+    ),
+    "data/corpus_manifest-v1.1-cached.json": (
+        "frame",
+        "osv_dump_sha256",
+        "advisories_seen",
+        "advisories_in_scope",
+        "repos_in_frame",
+        "repos_after_rule",
+        "repos_cloned",
+        "repos_selected",
+        "commits_inspected",
+        "candidates",
+        "accepted_positive",
+        "accepted_negative",
+        "rejected_no_sink",
+        "rejected_no_change",
+        "deduplicated",
+        "classes_covered",
+        "repos_covered",
+    ),
+    "data/corpus_manifest-v1.1-pilot.json": (
+        "frame",
+        "osv_dump_sha256",
+        "advisories_seen",
+        "advisories_in_scope",
+        "repos_in_frame",
+        "repos_cloned",
+        "commits_inspected",
+        "candidates",
+        "accepted_positive",
+        "accepted_negative",
+        "rejected_no_sink",
+        "rejected_no_change",
+        "deduplicated",
+        "classes_covered",
+        "repos_covered",
+    ),
+    "data/corpus_validation-v1.1.json": (
+        "dataset",
+        "sha256",
+        "records",
+        "pairs",
+        "repositories",
+        "groups",
+        "classes",
+        "evidence_tiers",
+        "checks",
+        "failure_counts",
+        "failures",
+    ),
+    "data/identity_rename-v1.1.json": ("dataset", "seed", "scopes"),
+    "data/ablation-v1.1.json": ("dataset", "rows"),
+    "data/patch_study-v1.1.json": (
+        "dataset",
+        "pairs",
+        "examined",
+        "flow_traced",
+        "flow_persists",
+        "flow_removed",
+        "flow_traded",
+        "any_killed",
+        "regression_any",
+    ),
+    "data/risk_benchmark-v1.1.json": (
+        "records",
+        "category_coverage",
+        "rank_discordance",
+        "rename_invariance",
+        "kill_rate",
+        "determinism",
+        "support",
+    ),
 }
 
 
@@ -473,7 +617,9 @@ def _verify_published_files(root: pathlib.Path) -> tuple[str, list[str]]:
                 # does not generate it; its absence is not a published-file
                 # problem. When the tree is the repository itself, anything
                 # else referenced must exist.
-                if value.replace("\\", "/").endswith(("corpus.jsonl", "records.jsonl")):
+                if value.replace("\\", "/").endswith(
+                    ("corpus.jsonl", "corpus-v1.1.jsonl", "records.jsonl")
+                ):
                     continue
                 # Source-bearing files (recorded answers and prompts) are
                 # deliberately not committed; the tree and the published
@@ -543,7 +689,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     results: list[tuple[str, str, list[str]]] = []
-    for check in CHECKS:
+    checks = CHECKS + EXPANDED_CHECKS
+    for check in checks:
         if args.only and check.name not in args.only:
             continue
         status, notes = _run_check(check, dataset_arg, root)
@@ -573,10 +720,11 @@ def main(argv: list[str] | None = None) -> int:
         "are normalised before a path is compared"
     )
     if shutil.which("bandit") is None or shutil.which("semgrep") is None:
-        print(
-            "note: bandit or semgrep is absent, so the competitor rows for those "
-            "tools were not compared; only SYRTH's row was"
-        )
+        if any(name == "competitor comparison" for name, _, _ in results):
+            print(
+                "note: bandit or semgrep is absent, so the competitor rows for those "
+                "tools were not compared; only SYRTH's row was"
+            )
     return 1 if failed else 0
 
 
