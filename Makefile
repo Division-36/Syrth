@@ -182,6 +182,13 @@ docs-check:
 build:
 	$(PYTHON) -m build
 
+# Prove the package installs and runs outside this checkout.
+smoke-install:
+	python3 -m venv /tmp/syrth-smoke
+	/tmp/syrth-smoke/bin/pip install --disable-pip-version-check .
+	/tmp/syrth-smoke/bin/syrth --version
+	/tmp/syrth-smoke/bin/syrth --path RLTESTS/rce_views.py > /dev/null
+
 clean:
 	rm -rf build dist *.egg-info .pytest_cache .ruff_cache
 	rm -f syrth_engine.h syrth_engine.so

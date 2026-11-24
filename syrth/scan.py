@@ -79,6 +79,10 @@ DEFAULT_THRESHOLD = 0.5
 #: File extensions the scanner accepts.
 SUPPORTED_EXTENSIONS: dict[str, Any] = {".py": PythonParser}
 
+#: An untrusted tree can contain a generated source file large enough to exhaust
+#: memory. Files above this limit are reported as errors, never read.
+MAX_FILE_BYTES = 4 * 1024 * 1024
+
 #: Directories never walked during a repository scan.
 PRUNED_DIRECTORIES = frozenset(
     {
@@ -87,6 +91,16 @@ PRUNED_DIRECTORIES = frozenset(
         "build", "dist", ".eggs", "site-packages",
     }
 )
+
+
+def _read_source(path: Path) -> tuple[str | None, str | None]:
+    """Read a scannable file, refusing one that is too large to be trusted."""
+    try:
+        if path.stat().st_size > MAX_FILE_BYTES:
+            return None, f"file exceeds {MAX_FILE_BYTES} bytes"
+        return path.read_text(encoding="utf-8", errors="replace"), None
+    except OSError as exc:
+        return None, f"{type(exc).__name__}: {exc}"
 
 
 class ScanError(RuntimeError):
@@ -457,11 +471,10 @@ class SyrthScanner:
         repository scan is not aborted by one unreadable file.
         """
         target = Path(path)
-        try:
-            source = target.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
+        source, error = _read_source(target)
+        if error is not None:
             report = ScanReport(file=str(target))
-            report.errors.append((str(target), f"{type(exc).__name__}: {exc}"))
+            report.errors.append((str(target), error))
             return report
         return self.scan_source(source, str(target))
 
@@ -488,10 +501,9 @@ class SyrthScanner:
         report = ScanReport(model=self.model_label)
 
         for path in files:
-            try:
-                source = path.read_text(encoding="utf-8", errors="replace")
-            except OSError as exc:
-                report.errors.append((str(path), f"{type(exc).__name__}: {exc}"))
+            source, error = _read_source(path)
+            if error is not None:
+                report.errors.append((str(path), error))
                 continue
             file_traces.append(self.parse(source, str(path)))
             if file_traces[-1].parse_errors:

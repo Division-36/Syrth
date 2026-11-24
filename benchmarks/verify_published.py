@@ -317,7 +317,11 @@ def _run_check(
                 f"{check.dataset} is not present, so the expanded-corpus "
                 "check cannot run"
             ]
-    dataset_arg = check.dataset or dataset
+        # The corpus may live under --root while the harness code does not;
+        # pass its absolute path and keep the working directory at the code.
+        dataset_arg = str(candidate)
+    else:
+        dataset_arg = dataset
     with tempfile.TemporaryDirectory() as directory:
         output = pathlib.Path(directory) / "result.json"
         command = [
@@ -331,7 +335,7 @@ def _run_check(
         try:
             completed = subprocess.run(
                 command,
-                cwd=root,
+                cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
                 check=False,

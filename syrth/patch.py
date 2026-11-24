@@ -46,6 +46,7 @@ from __future__ import annotations
 import ast
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -458,8 +459,7 @@ class CommandBackend:
         yields a refused proposal carrying the reason, so a broken backend is
         visible rather than silent.
         """
-        workspace = Path(".syrth-patch").resolve()
-        workspace.mkdir(parents=True, exist_ok=True)
+        workspace = Path(tempfile.mkdtemp(prefix="syrth-patch-"))
         target = workspace / "input.py"
         target.write_text(source, encoding="utf-8")
         try:
@@ -486,7 +486,7 @@ class CommandBackend:
                 refused=True,
             )
         finally:
-            target.unlink(missing_ok=True)
+            shutil.rmtree(workspace, ignore_errors=True)
 
         if completed.returncode != 0:
             return PatchProposal(
