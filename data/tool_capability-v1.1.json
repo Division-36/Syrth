@@ -1,0 +1,233 @@
+{
+  "competitors_source": "data/competitor_benchmark.json",
+  "trees_source": "data/tool_comparison.json",
+  "populations": {
+    "expected_classes": 320,
+    "whole_repositories": 43
+  },
+  "matched_layers": {
+    "snippet": "same 350 records, same independent AST ground truth",
+    "tree": "same 24 repositories, same fix commits, same labelled file and function",
+    "capability": "output contract, not a measurement"
+  },
+  "no_accuracy_claim": true,
+  "instruments": {
+    "syrth": {
+      "label": "SYRTH 1.1",
+      "snippet": {
+        "class_coverage": {
+          "count": 309,
+          "of": 320,
+          "share": 0.9656
+        },
+        "sink_coverage": {
+          "count": 605,
+          "of": 648,
+          "share": 0.9336
+        },
+        "fix_noticed": {
+          "count": 20,
+          "of": 202,
+          "share": 0.099
+        }
+      },
+      "tree": {
+        "advisory_file": {
+          "count": 39,
+          "of": 43,
+          "share": 0.907
+        },
+        "advisory_function": {
+          "count": 21,
+          "of": 43,
+          "share": 0.4884
+        },
+        "findings": 603797,
+        "named_findings": 10596,
+        "co_located_findings": 10596,
+        "seconds": 911.46
+      },
+      "capability": {
+        "path": true,
+        "identity": true,
+        "verification": true
+      }
+    },
+    "bandit": {
+      "label": "Bandit 1.9.4",
+      "snippet": {
+        "class_coverage": {
+          "count": 38,
+          "of": 320,
+          "share": 0.1187
+        },
+        "sink_coverage": {
+          "count": 17,
+          "of": 648,
+          "share": 0.0262
+        },
+        "fix_noticed": {
+          "count": 13,
+          "of": 121,
+          "share": 0.1074
+        }
+      },
+      "tree": {
+        "advisory_file": {
+          "count": 30,
+          "of": 43,
+          "share": 0.6977
+        },
+        "advisory_function": {
+          "count": 9,
+          "of": 43,
+          "share": 0.2093
+        },
+        "findings": 148840,
+        "named_findings": 63224,
+        "co_located_findings": 2825,
+        "seconds": 458.49
+      },
+      "capability": {
+        "path": false,
+        "identity": false,
+        "verification": false
+      }
+    },
+    "semgrep": {
+      "label": "Semgrep 1.180.0 (security-audit)",
+      "snippet": {
+        "class_coverage": {
+          "count": 31,
+          "of": 320,
+          "share": 0.0969
+        },
+        "sink_coverage": {
+          "count": 86,
+          "of": 648,
+          "share": 0.1327
+        },
+        "fix_noticed": {
+          "count": 11,
+          "of": 42,
+          "share": 0.2619
+        }
+      },
+      "tree": {
+        "advisory_file": {
+          "count": 16,
+          "of": 43,
+          "share": 0.3721
+        },
+        "advisory_function": {
+          "count": 4,
+          "of": 43,
+          "share": 0.093
+        },
+        "findings": 1608,
+        "named_findings": 658,
+        "co_located_findings": 350,
+        "seconds": 1226.43
+      },
+      "capability": {
+        "path": false,
+        "identity": false,
+        "verification": false
+      }
+    },
+    "ruff": {
+      "label": "Ruff 0.16.10 (--select S)",
+      "snippet": {
+        "class_coverage": {
+          "count": 0,
+          "of": 320,
+          "share": 0.0
+        },
+        "sink_coverage": {
+          "count": 97,
+          "of": 648,
+          "share": 0.1497
+        },
+        "fix_noticed": {
+          "count": 0,
+          "of": 0,
+          "share": 0.0
+        }
+      },
+      "tree": {
+        "advisory_file": {
+          "count": 29,
+          "of": 43,
+          "share": 0.6744
+        },
+        "advisory_function": {
+          "count": 9,
+          "of": 43,
+          "share": 0.2093
+        },
+        "findings": 101861,
+        "named_findings": 43961,
+        "co_located_findings": 2197,
+        "seconds": 9.59
+      },
+      "capability": {
+        "path": false,
+        "identity": false,
+        "verification": false
+      }
+    }
+  },
+  "strength_profile": {
+    "sink_coverage": {
+      "leader": "SYRTH 1.1",
+      "ours": 605,
+      "next_best": 97,
+      "population": 648,
+      "margin": 508
+    },
+    "class_coverage": {
+      "leader": "SYRTH 1.1",
+      "ours": 309,
+      "next_best": 38,
+      "population": 320,
+      "margin": 271
+    },
+    "advisory_function": {
+      "leader": "SYRTH 1.1",
+      "ours": 21,
+      "next_best": 9,
+      "population": 43,
+      "margin": 12
+    }
+  },
+  "capability_matrix": {
+    "syrth": {
+      "path": true,
+      "identity": true,
+      "verification": true
+    },
+    "bandit": {
+      "path": false,
+      "identity": false,
+      "verification": false
+    },
+    "semgrep": {
+      "path": false,
+      "identity": false,
+      "verification": false
+    },
+    "ruff": {
+      "path": false,
+      "identity": false,
+      "verification": false
+    }
+  },
+  "warnings": [
+    "Bandit 1.9.4 lacks capability/measurement data: path, identity, verification",
+    "Semgrep 1.180.0 (security-audit) lacks capability/measurement data: path, identity, verification",
+    "Ruff 0.16.10 (--select S) lacks capability/measurement data: path, identity, verification"
+  ],
+  "zero_denominators": [
+    "ruff.snippet.fix_noticed has a zero denominator"
+  ]
+}

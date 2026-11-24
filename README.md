@@ -158,7 +158,7 @@ harness again and compares the result with the file the documentation quotes.
 syrth/        the analyser: parser, taint, registry, guards, reporting
 benchmarks/   the measurement surface and the corpus comparison harness
 tools/        the corpus builder
-tests/        685 tests
+tests/        686 tests
 docs/         the contract, the measurements, and their limits
 data/         the published measurement files the documentation quotes
 RLTESTS/      smoke-test fixtures: deliberately vulnerable modules

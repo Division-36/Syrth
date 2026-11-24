@@ -140,6 +140,29 @@ tool-capability:
 		--trees data/tool_comparison.json \
 		--json data/tool_capability.json
 
+# Post-registration comparison on the expanded corpus. The filter drops the 19
+# pairs whose patched body is unchanged, because the mitigation column cannot
+# measure those. Six snippet instruments, then four whole-worktree instruments
+# over 43 repositories, then the same matched capability profile.
+competitors-v11:
+	$(PYTHON) tools/filter_comparable.py --dataset data/corpus-v1.1.jsonl \
+		--out data/corpus-v1.1-compare.jsonl
+	PATH="$(HOME)/.local/bin:$$PATH" $(PYTHON) -m benchmarks.competitors \
+		--dataset data/corpus-v1.1-compare.jsonl \
+		--json data/competitor_benchmark-v1.1.json
+
+tool-comparison-v11:
+	PATH="$(HOME)/.local/bin:$$PATH" $(PYTHON) -m benchmarks.tool_comparison \
+		--dataset data/corpus-v1.1.jsonl \
+		--repos experiments/scratch/repos \
+		--json data/tool_comparison-v1.1.json
+
+tool-capability-v11:
+	$(PYTHON) -m benchmarks.tool_capability_study \
+		--competitors data/competitor_benchmark-v1.1.json \
+		--trees data/tool_comparison-v1.1.json \
+		--json data/tool_capability-v1.1.json
+
 # Re-derive the patch-verification study from its recorded answers. The raw
 # answers embed third-party source and are not committed; see the study doc.
 patch-verification:

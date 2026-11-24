@@ -181,6 +181,17 @@ EXPANDED_CHECKS: tuple[Check, ...] = (
         ("--dataset", "{dataset}"),
         dataset=EXPANDED_DATASET,
     ),
+    # The 19 pairs whose patched body is unchanged are excluded by
+    # `tools/filter_comparable.py`; the published file records the resulting
+    # 700 records / 350 pairs in its own `corpus` field.
+    Check(
+        "expanded competitor comparison",
+        "data/competitor_benchmark-v1.1.json",
+        "benchmarks.competitors",
+        ("--dataset", "{dataset}"),
+        dataset="data/corpus-v1.1-compare.jsonl",
+        compare="syrth-only",
+    ),
 )
 
 
@@ -580,6 +591,27 @@ EXPECTED_KEYS: dict[str, tuple[str, ...]] = {
         "determinism",
         "support",
     ),
+    "data/competitor_benchmark-v1.1.json": ("corpus", "records", "pairs", "tools"),
+    "data/tool_comparison-v1.1.json": (
+        "dataset",
+        "repos",
+        "repositories",
+        "tools",
+        "scope",
+        "complete",
+        "per_tool",
+        "rows",
+    ),
+    "data/tool_capability-v1.1.json": (
+        "populations",
+        "matched_layers",
+        "no_accuracy_claim",
+        "instruments",
+        "strength_profile",
+        "capability_matrix",
+        "warnings",
+        "zero_denominators",
+    ),
 }
 
 
@@ -618,7 +650,8 @@ def _verify_published_files(root: pathlib.Path) -> tuple[str, list[str]]:
                 # problem. When the tree is the repository itself, anything
                 # else referenced must exist.
                 if value.replace("\\", "/").endswith(
-                    ("corpus.jsonl", "corpus-v1.1.jsonl", "records.jsonl")
+                    ("corpus.jsonl", "corpus-v1.1.jsonl",
+                     "corpus-v1.1-compare.jsonl", "records.jsonl")
                 ):
                     continue
                 # Source-bearing files (recorded answers and prompts) are

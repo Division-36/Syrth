@@ -63,10 +63,18 @@ from syrth.scan import SyrthScanner
 #: Classes SYRTH models, and therefore the only ones a comparison may score.
 IN_SCOPE_LABELS = frozenset(CWE_TO_CATEGORY)
 
-#: Commands used when the tool is not already importable. ``uvx`` pins nothing,
-#: so results record the version each tool actually reported.
-BANDIT_CMD = ["uvx", "--from", "bandit", "bandit"]
-SEMGREP_CMD = ["uvx", "--from", "semgrep", "semgrep"]
+#: Prefer the installed binary; ``uvx`` is only the fallback for a machine
+#: without it. Both paths record the version the tool actually reported.
+def _command(name: str, package: str) -> list[str]:
+    found = shutil.which(name)
+    if not found:
+        local = Path.home() / ".local" / "bin" / name
+        found = str(local) if local.is_file() else None
+    return [found] if found else ["uvx", "--from", package, name]
+
+
+BANDIT_CMD = _command("bandit", "bandit")
+SEMGREP_CMD = _command("semgrep", "semgrep")
 
 #: Extra Semgrep rule sets, each measured as its own tool. A config is part of
 #: what a tool ships, so "semgrep with one config" and "semgrep with another"
@@ -76,6 +84,9 @@ SEMGREP_CONFIGS = (
     ("semgrep", "p/security-audit"),
     ("semgrep-owasp", "p/owasp-top-ten"),
     ("semgrep-python", "p/python"),
+    ("semgrep-flask", "p/flask"),
+    ("semgrep-django", "p/django"),
+    ("semgrep-fastapi", "p/fastapi"),
 )
 
 #: Tools that do not publish CWE metadata in their machine-readable output. They
@@ -83,7 +94,7 @@ SEMGREP_CONFIGS = (
 #: rules and pylint's security messages both find real sinks, they just do not
 #: label them with a class, and excluding them would flatter the table.
 NO_CWE_TOOLS = frozenset({"ruff", "pylint"})
-RUFF_CMD = ["uvx", "--from", "ruff", "ruff"]
+RUFF_CMD = _command("ruff", "ruff")
 
 #: Ruff rule code -> the sink it names, so ruff can be scored on the sink axis
 #: despite publishing no CWE. These are *sink identities* (the call the rule

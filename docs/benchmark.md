@@ -20,6 +20,12 @@ deviations and screening funnel are in
 measurements are the `data/*-v1.1.json` files. The results below remain the frozen
 v1 figures, because the external instruments were run on v1 only.
 
+A later, **post-registration** comparison runs nine snippet instruments on
+700 records / 350 pairs and four whole-tree instruments over 43 repositories.
+It is reported separately in
+[experiments/tool-comparison-v1.1.md](experiments/tool-comparison-v1.1.md)
+and is never pooled with the registered studies or the v1 table.
+
 ## Why the metrics are unusual
 
 SYRTH is a risk-surface tool, not a classifier. It does not decide "vulnerable or

@@ -1,0 +1,280 @@
+{
+  "corpus": "data/corpus-v1.1-compare.jsonl",
+  "records": 700,
+  "pairs": 350,
+  "ground_truth": "benchmarks.risk_metrics.expected_classes",
+  "tools": {
+    "syrth": {
+      "available": true,
+      "error": "",
+      "covered": 309,
+      "expected": 320,
+      "percent": 96.56,
+      "unmapped_findings": 0,
+      "seconds": 2.581,
+      "fix_noticed": 20,
+      "still_flagged_after_fix": 182,
+      "measurable_pairs": 202,
+      "fix_noticed_percent": 9.9,
+      "sinks_covered": 605,
+      "sinks_expected": 648,
+      "sink_percent": 93.36,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-502",
+        "CWE-601",
+        "CWE-611",
+        "CWE-79",
+        "CWE-89",
+        "CWE-918",
+        "CWE-94"
+      ],
+      "per_class": {
+        "CWE-22": "148/155",
+        "CWE-502": "29/29",
+        "CWE-601": "59/59",
+        "CWE-611": "3/5",
+        "CWE-79": "24/26",
+        "CWE-89": "8/8",
+        "CWE-918": "12/12",
+        "CWE-94": "26/26"
+      }
+    },
+    "bandit": {
+      "available": true,
+      "error": "",
+      "covered": 38,
+      "expected": 320,
+      "percent": 11.88,
+      "unmapped_findings": 0,
+      "seconds": 3.349,
+      "fix_noticed": 13,
+      "still_flagged_after_fix": 108,
+      "measurable_pairs": 121,
+      "fix_noticed_percent": 10.74,
+      "sinks_covered": 17,
+      "sinks_expected": 648,
+      "sink_percent": 2.62,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-502",
+        "CWE-79",
+        "CWE-89"
+      ],
+      "per_class": {
+        "CWE-22": "1/155",
+        "CWE-502": "23/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "12/26",
+        "CWE-89": "2/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "semgrep": {
+      "available": true,
+      "error": "",
+      "covered": 31,
+      "expected": 320,
+      "percent": 9.69,
+      "unmapped_findings": 0,
+      "seconds": 17.585,
+      "fix_noticed": 11,
+      "still_flagged_after_fix": 31,
+      "measurable_pairs": 42,
+      "fix_noticed_percent": 26.19,
+      "sinks_covered": 86,
+      "sinks_expected": 648,
+      "sink_percent": 13.27,
+      "classes_modelled": [
+        "CWE-502",
+        "CWE-601",
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "0/155",
+        "CWE-502": "15/29",
+        "CWE-601": "8/59",
+        "CWE-611": "0/5",
+        "CWE-79": "8/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "semgrep-owasp": {
+      "available": true,
+      "error": "",
+      "covered": 4,
+      "expected": 320,
+      "percent": 1.25,
+      "unmapped_findings": 0,
+      "seconds": 21.284,
+      "fix_noticed": 3,
+      "still_flagged_after_fix": 8,
+      "measurable_pairs": 11,
+      "fix_noticed_percent": 27.27,
+      "sinks_covered": 4,
+      "sinks_expected": 648,
+      "sink_percent": 0.62,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "2/155",
+        "CWE-502": "0/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "2/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "semgrep-python": {
+      "available": true,
+      "error": "",
+      "covered": 4,
+      "expected": 320,
+      "percent": 1.25,
+      "unmapped_findings": 0,
+      "seconds": 35.66,
+      "fix_noticed": 3,
+      "still_flagged_after_fix": 8,
+      "measurable_pairs": 11,
+      "fix_noticed_percent": 27.27,
+      "sinks_covered": 4,
+      "sinks_expected": 648,
+      "sink_percent": 0.62,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "2/155",
+        "CWE-502": "0/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "2/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "semgrep-flask": {
+      "available": true,
+      "error": "",
+      "covered": 4,
+      "expected": 320,
+      "percent": 1.25,
+      "unmapped_findings": 0,
+      "seconds": 18.689,
+      "fix_noticed": 2,
+      "still_flagged_after_fix": 2,
+      "measurable_pairs": 4,
+      "fix_noticed_percent": 50.0,
+      "sinks_covered": 4,
+      "sinks_expected": 648,
+      "sink_percent": 0.62,
+      "classes_modelled": [
+        "CWE-22",
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "2/155",
+        "CWE-502": "0/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "2/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "semgrep-django": {
+      "available": true,
+      "error": "",
+      "covered": 2,
+      "expected": 320,
+      "percent": 0.62,
+      "unmapped_findings": 0,
+      "seconds": 21.273,
+      "fix_noticed": 0,
+      "still_flagged_after_fix": 1,
+      "measurable_pairs": 1,
+      "fix_noticed_percent": 0.0,
+      "sinks_covered": 0,
+      "sinks_expected": 648,
+      "sink_percent": 0.0,
+      "classes_modelled": [
+        "CWE-79"
+      ],
+      "per_class": {
+        "CWE-22": "0/155",
+        "CWE-502": "0/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "2/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "semgrep-fastapi": {
+      "available": true,
+      "error": "",
+      "covered": 0,
+      "expected": 320,
+      "percent": 0.0,
+      "unmapped_findings": 0,
+      "seconds": 12.248,
+      "fix_noticed": 0,
+      "still_flagged_after_fix": 0,
+      "measurable_pairs": 0,
+      "fix_noticed_percent": 0.0,
+      "sinks_covered": 0,
+      "sinks_expected": 648,
+      "sink_percent": 0.0,
+      "classes_modelled": [],
+      "per_class": {
+        "CWE-22": "0/155",
+        "CWE-502": "0/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "0/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    },
+    "ruff": {
+      "available": true,
+      "error": "",
+      "covered": 0,
+      "expected": 320,
+      "percent": 0.0,
+      "unmapped_findings": 221,
+      "seconds": 0.041,
+      "fix_noticed": 0,
+      "still_flagged_after_fix": 0,
+      "measurable_pairs": 0,
+      "fix_noticed_percent": 0.0,
+      "sinks_covered": 97,
+      "sinks_expected": 648,
+      "sink_percent": 14.97,
+      "classes_modelled": [],
+      "per_class": {
+        "CWE-22": "0/155",
+        "CWE-502": "0/29",
+        "CWE-601": "0/59",
+        "CWE-611": "0/5",
+        "CWE-79": "0/26",
+        "CWE-89": "0/8",
+        "CWE-918": "0/12",
+        "CWE-94": "0/26"
+      }
+    }
+  }
+}

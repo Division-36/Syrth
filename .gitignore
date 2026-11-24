@@ -86,6 +86,11 @@ data/*.json
 !data/patch_study-v1.1.json
 !data/risk_benchmark-v1.1.json
 !data/ablation-v1.1.json
+# Expanded tool comparison: six instruments on 700 records / 350 pairs, and
+# whole-worktree co-location on 43 repositories.
+!data/competitor_benchmark-v1.1.json
+!data/tool_comparison-v1.1.json
+!data/tool_capability-v1.1.json
 # Whole-repository tool comparison in compact form: every count the docs quote.
 # The raw per-finding lists stay in experiments/scratch and are reproducible
 # with `make tool-comparison`.
