@@ -5,7 +5,8 @@ All output shown here was produced by the commands beside it.
 ## Install
 
 ```bash
-pip install -e .                 # rules only: tree-sitter + tree-sitter-python
+pip install .                    # standalone: rules only, tree-sitter + tree-sitter-python
+pip install -e .                 # editable development install
 pip install -e ".[ml]"           # adds xgboost, scikit-learn, numpy, joblib
 pip install -e ".[dev,benchmark]"
 ```

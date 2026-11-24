@@ -1,6 +1,6 @@
 # Security policy
 
-SYRTH 1.1 is a static analyser. It reads source code and writes a report; it
+SYRTH 1.2.0 is a static analyser. It reads source code and writes a report; it
 does not decide whether code is vulnerable and it makes no network requests at
 scan time.
 

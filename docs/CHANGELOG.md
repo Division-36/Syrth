@@ -1,4 +1,13 @@
-## Unreleased
+## v1.2.0 — 2026-11-24
+
+**The expanded-evidence and standalone-hardening release.** The corpus grows
+from v1 to v1.1 (738 records / 369 pairs / 43 repositories) while v1 stays
+frozen. Nine snippet instruments and four whole-tree instruments are compared
+on that corpus, published as a separate, post-registration study. The scanner
+is now installable as a standalone package, with a documented trust model,
+a clean-venv smoke test, a private temporary directory for `--patch-command`,
+and a 4 MiB guard on source files. No precision, recall or accuracy claim is
+made, and no external upload or DOI plan was added.
 
 ### Changed
 

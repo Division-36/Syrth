@@ -54,7 +54,8 @@ read before quoting any figure from this project.
 ## Install and run
 
 ```bash
-pip install -e .                 # two dependencies: tree-sitter only
+pip install .                    # standalone; two dependencies: tree-sitter only
+pip install -e .                 # editable development install
 pip install -e ".[dev,benchmark]"
 
 syrth --file app.py
@@ -73,6 +74,7 @@ Python 3.10+. No PyTorch, no model server, no network.
 | know what it cannot do | [docs/limitations.md](docs/limitations.md) |
 | understand the pipeline | [docs/architecture.md](docs/architecture.md) |
 | know what the v1 pipeline got wrong | [docs/withdrawn-v1.md](docs/withdrawn-v1.md) |
+| trust boundaries and vulnerability reports | [SECURITY.md](SECURITY.md) |
 
 ## Measured behaviour
 
